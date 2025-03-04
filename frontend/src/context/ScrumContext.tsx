@@ -14,6 +14,7 @@ export interface Task {
   assignee?: string;
   storyId?: string;
   sprintId?: string;
+  projectId: string;
 }
 
 export interface Story {
@@ -22,6 +23,7 @@ export interface Story {
   description: string;
   createdAt: string;
   status: 'New' | 'Ready' | 'In Sprint';
+  projectId: string;
 }
 
 export interface Sprint {
@@ -34,16 +36,36 @@ export interface Sprint {
   capacity: number;
   status: 'Planned' | 'In Progress' | 'Completed';
   tasks: Task[];
+  projectId: string;
+}
+
+export interface Project {
+  id: string;
+  title: string;
+  description: string;
+  startDate: string;
+  estimatedDuration: number; // in weeks
+  sprintDuration: number; // in weeks
+  createdAt: string;
+  status: 'Active' | 'Completed' | 'On Hold';
 }
 
 interface ScrumContextType {
+  // Project operations
+  projects: Project[];
+  currentProject: Project | null;
+  addProject: (project: Omit<Project, 'id' | 'createdAt'>) => void;
+  updateProject: (project: Project) => void;
+  deleteProject: (projectId: string) => void;
+  setCurrentProject: (projectId: string) => void;
+  
   // Data
   tasks: Task[];
   stories: Story[];
   sprints: Sprint[];
   
   // Task operations
-  addTask: (task: Omit<Task, 'id' | 'createdAt'>) => void;
+  addTask: (task: Omit<Task, 'id' | 'createdAt' | 'projectId'>) => void;
   updateTask: (task: Task) => void;
   deleteTask: (taskId: string) => void;
   assignTaskToStory: (taskId: string, storyId: string) => void;
@@ -53,12 +75,12 @@ interface ScrumContextType {
   moveTaskStatus: (taskId: string, newStatus: Task['status']) => void;
   
   // Story operations
-  addStory: (story: Omit<Story, 'id' | 'createdAt'>) => void;
+  addStory: (story: Omit<Story, 'id' | 'createdAt' | 'projectId'>) => void;
   updateStory: (story: Story) => void;
   deleteStory: (storyId: string) => void;
   
   // Sprint operations
-  addSprint: (sprint: Omit<Sprint, 'id' | 'tasks'>) => void;
+  addSprint: (sprint: Omit<Sprint, 'id' | 'tasks' | 'projectId'>) => void;
   updateSprint: (sprint: Sprint) => void;
   deleteSprint: (sprintId: string) => void;
   
@@ -69,12 +91,25 @@ interface ScrumContextType {
   getBacklogTasks: () => Task[];
   getSprintTasks: (sprintId: string) => Task[];
   getCurrentSprint: () => Sprint | undefined;
+  getProjectTasks: (projectId: string) => Task[];
+  getProjectStories: (projectId: string) => Story[];
+  getProjectSprints: (projectId: string) => Sprint[];
 }
 
-// Create context
-const ScrumContext = createContext<ScrumContextType | undefined>(undefined);
-
 // Initial data
+const initialProjects: Project[] = [
+  {
+    id: uuidv4(),
+    title: 'E-commerce Platform',
+    description: 'Building a modern e-commerce platform with React and Node.js',
+    startDate: '2025-03-15',
+    estimatedDuration: 12,
+    sprintDuration: 2,
+    createdAt: '2025-03-15',
+    status: 'Active'
+  }
+];
+
 const initialTasks: Task[] = [
   {
     id: uuidv4(),
@@ -84,7 +119,8 @@ const initialTasks: Task[] = [
     storyPoints: 8,
     status: 'Ready',
     createdAt: '2025-03-15',
-    assignee: 'Alex Johnson'
+    assignee: 'Alex Johnson',
+    projectId: initialProjects[0].id
   },
   {
     id: uuidv4(),
@@ -94,34 +130,8 @@ const initialTasks: Task[] = [
     storyPoints: 5,
     status: 'Ready',
     createdAt: '2025-03-16',
-    assignee: 'Emily Davis'
-  },
-  {
-    id: uuidv4(),
-    title: 'API integration for product data',
-    description: 'Connect to backend API to fetch and display product information',
-    priority: 'High',
-    storyPoints: 13,
-    status: 'New',
-    createdAt: '2025-03-17'
-  },
-  {
-    id: uuidv4(),
-    title: 'Implement search functionality',
-    description: 'Add search feature with filters and sorting options',
-    priority: 'Medium',
-    storyPoints: 8,
-    status: 'New',
-    createdAt: '2025-03-18'
-  },
-  {
-    id: uuidv4(),
-    title: 'Create user profile page',
-    description: 'Design and implement user profile with edit capabilities',
-    priority: 'Low',
-    storyPoints: 5,
-    status: 'New',
-    createdAt: '2025-03-19'
+    assignee: 'Emily Davis',
+    projectId: initialProjects[0].id
   }
 ];
 
@@ -131,66 +141,53 @@ const initialStories: Story[] = [
     title: 'User Authentication',
     description: 'All features related to user authentication and authorization',
     createdAt: '2025-03-14',
-    status: 'Ready'
+    status: 'Ready',
+    projectId: initialProjects[0].id
   },
   {
     id: uuidv4(),
     title: 'Dashboard Features',
     description: 'Dashboard layout and visualization components',
     createdAt: '2025-03-15',
-    status: 'New'
+    status: 'New',
+    projectId: initialProjects[0].id
   }
 ];
 
 const initialSprints: Sprint[] = [
   {
     id: uuidv4(),
-    name: 'Sprint 7',
+    name: 'Sprint 1',
     description: 'Focus on authentication and dashboard features',
     startDate: format(new Date(), 'yyyy-MM-dd'),
     endDate: format(addDays(new Date(), 14), 'yyyy-MM-dd'),
     goal: 'Complete user authentication and dashboard features',
     capacity: 40,
     status: 'In Progress',
-    tasks: [
-      {
-        id: uuidv4(),
-        title: 'Setup API endpoints',
-        description: 'Create backend API endpoints for user data',
-        priority: 'Medium',
-        storyPoints: 3,
-        status: 'Done',
-        createdAt: '2025-03-10',
-        assignee: 'Michael Brown'
-      },
-      {
-        id: uuidv4(),
-        title: 'Implement form validation',
-        description: 'Add client-side validation for all forms',
-        priority: 'Low',
-        storyPoints: 2,
-        status: 'Review',
-        createdAt: '2025-03-11',
-        assignee: 'Sarah Williams'
-      }
-    ]
-  },
-  {
-    id: uuidv4(),
-    name: 'Sprint 8',
-    description: 'Focus on search and filtering features',
-    startDate: format(addDays(new Date(), 15), 'yyyy-MM-dd'),
-    endDate: format(addDays(new Date(), 29), 'yyyy-MM-dd'),
-    goal: 'Implement search functionality and filters',
-    capacity: 35,
-    status: 'Planned',
+    projectId: initialProjects[0].id,
     tasks: []
   }
 ];
 
+// Create context
+const ScrumContext = createContext<ScrumContextType | undefined>(undefined);
+
 // Provider component
 export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Load data from localStorage or use initial data
+  const [projects, setProjects] = useState<Project[]>(() => {
+    const savedProjects = localStorage.getItem('scrumProjects');
+    return savedProjects ? JSON.parse(savedProjects) : initialProjects;
+  });
+  
+  const [currentProject, setCurrentProject] = useState<Project | null>(() => {
+    const savedCurrentProjectId = localStorage.getItem('currentProjectId');
+    if (savedCurrentProjectId) {
+      return projects.find(p => p.id === savedCurrentProjectId) || projects[0];
+    }
+    return projects[0];
+  });
+  
   const [tasks, setTasks] = useState<Task[]>(() => {
     const savedTasks = localStorage.getItem('scrumTasks');
     return savedTasks ? JSON.parse(savedTasks) : initialTasks;
@@ -208,6 +205,16 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Save to localStorage whenever data changes
   useEffect(() => {
+    localStorage.setItem('scrumProjects', JSON.stringify(projects));
+  }, [projects]);
+  
+  useEffect(() => {
+    if (currentProject) {
+      localStorage.setItem('currentProjectId', currentProject.id);
+    }
+  }, [currentProject]);
+  
+  useEffect(() => {
     localStorage.setItem('scrumTasks', JSON.stringify(tasks));
   }, [tasks]);
   
@@ -219,12 +226,60 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem('scrumSprints', JSON.stringify(sprints));
   }, [sprints]);
 
+  // Project operations
+  const addProject = (project: Omit<Project, 'id' | 'createdAt'>) => {
+    const newProject: Project = {
+      ...project,
+      id: uuidv4(),
+      createdAt: format(new Date(), 'yyyy-MM-dd')
+    };
+    setProjects([...projects, newProject]);
+    if (!currentProject) {
+      setCurrentProject(newProject);
+    }
+  };
+
+  const updateProject = (updatedProject: Project) => {
+    setProjects(projects.map(project => 
+      project.id === updatedProject.id ? updatedProject : project
+    ));
+    if (currentProject?.id === updatedProject.id) {
+      setCurrentProject(updatedProject);
+    }
+  };
+
+  const deleteProject = (projectId: string) => {
+    // Delete all related tasks, stories, and sprints
+    setTasks(tasks.filter(task => task.projectId !== projectId));
+    setStories(stories.filter(story => story.projectId !== projectId));
+    setSprints(sprints.filter(sprint => sprint.projectId !== projectId));
+    
+    // Delete the project
+    setProjects(projects.filter(project => project.id !== projectId));
+    
+    // If current project is deleted, switch to another project
+    if (currentProject?.id === projectId) {
+      const remainingProjects = projects.filter(project => project.id !== projectId);
+      setCurrentProject(remainingProjects.length > 0 ? remainingProjects[0] : null);
+    }
+  };
+
+  const setActiveProject = (projectId: string) => {
+    const project = projects.find(p => p.id === projectId);
+    if (project) {
+      setCurrentProject(project);
+    }
+  };
+
   // Task operations
-  const addTask = (task: Omit<Task, 'id' | 'createdAt'>) => {
+  const addTask = (task: Omit<Task, 'id' | 'createdAt' | 'projectId'>) => {
+    if (!currentProject) return;
+    
     const newTask: Task = {
       ...task,
       id: uuidv4(),
-      createdAt: format(new Date(), 'yyyy-MM-dd')
+      createdAt: format(new Date(), 'yyyy-MM-dd'),
+      projectId: currentProject.id
     };
     setTasks([...tasks, newTask]);
   };
@@ -252,31 +307,24 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const assignTaskToSprint = (taskId: string, sprintId: string) => {
-    // Find the task
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
     
-    // If task is in backlog, move it to the sprint
-    if (!task.sprintId) {
-      // Update task status to 'To Do' when assigned to a sprint
-      const updatedTask = { 
-        ...task, 
-        sprintId, 
-        status: 'To Do' as Task['status']
-      };
-      
-      setTasks(tasks.map(t => 
-        t.id === taskId ? updatedTask : t
-      ));
-    }
+    const updatedTask = { 
+      ...task, 
+      sprintId, 
+      status: 'To Do' as Task['status']
+    };
+    
+    setTasks(tasks.map(t => 
+      t.id === taskId ? updatedTask : t
+    ));
   };
 
   const removeTaskFromSprint = (taskId: string) => {
-    // Find the task
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
     
-    // Reset status to 'New' or 'Ready' when removed from sprint
     const updatedTask = { 
       ...task, 
       sprintId: undefined, 
@@ -297,11 +345,14 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   // Story operations
-  const addStory = (story: Omit<Story, 'id' | 'createdAt'>) => {
+  const addStory = (story: Omit<Story, 'id' | 'createdAt' | 'projectId'>) => {
+    if (!currentProject) return;
+    
     const newStory: Story = {
       ...story,
       id: uuidv4(),
-      createdAt: format(new Date(), 'yyyy-MM-dd')
+      createdAt: format(new Date(), 'yyyy-MM-dd'),
+      projectId: currentProject.id
     };
     setStories([...stories, newStory]);
   };
@@ -313,21 +364,21 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const deleteStory = (storyId: string) => {
-    // Remove story
     setStories(stories.filter(story => story.id !== storyId));
-    
-    // Update tasks that were assigned to this story
     setTasks(tasks.map(task => 
       task.storyId === storyId ? { ...task, storyId: undefined } : task
     ));
   };
 
   // Sprint operations
-  const addSprint = (sprint: Omit<Sprint, 'id' | 'tasks'>) => {
+  const addSprint = (sprint: Omit<Sprint, 'id' | 'tasks' | 'projectId'>) => {
+    if (!currentProject) return;
+    
     const newSprint: Sprint = {
       ...sprint,
       id: uuidv4(),
-      tasks: []
+      tasks: [],
+      projectId: currentProject.id
     };
     setSprints([...sprints, newSprint]);
   };
@@ -339,11 +390,7 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const deleteSprint = (sprintId: string) => {
-    // Find sprint to delete
-    const sprintToDelete = sprints.find(s => s.id === sprintId);
-    if (!sprintToDelete) return;
-    
-    // Move tasks back to backlog
+    setSprints(sprints.filter(sprint => sprint.id !== sprintId));
     setTasks(tasks.map(task => 
       task.sprintId === sprintId 
         ? { 
@@ -355,9 +402,6 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           } 
         : task
     ));
-    
-    // Remove sprint
-    setSprints(sprints.filter(sprint => sprint.id !== sprintId));
   };
 
   // Bulk operations
@@ -375,18 +419,41 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Utility functions
   const getBacklogTasks = () => {
-    return tasks.filter(task => !task.sprintId);
+    if (!currentProject) return [];
+    return tasks.filter(task => !task.sprintId && task.projectId === currentProject.id);
   };
 
   const getSprintTasks = (sprintId: string) => {
-    return tasks.filter(task => task.sprintId === sprintId);
+    if (!currentProject) return [];
+    return tasks.filter(task => task.sprintId === sprintId && task.projectId === currentProject.id);
   };
 
   const getCurrentSprint = () => {
-    return sprints.find(sprint => sprint.status === 'In Progress');
+    if (!currentProject) return undefined;
+    return sprints.find(sprint => 
+      sprint.status === 'In Progress' && sprint.projectId === currentProject.id
+    );
+  };
+
+  const getProjectTasks = (projectId: string) => {
+    return tasks.filter(task => task.projectId === projectId);
+  };
+
+  const getProjectStories = (projectId: string) => {
+    return stories.filter(story => story.projectId === projectId);
+  };
+
+  const getProjectSprints = (projectId: string) => {
+    return sprints.filter(sprint => sprint.projectId === projectId);
   };
 
   const value = {
+    projects,
+    currentProject,
+    addProject,
+    updateProject,
+    deleteProject,
+    setCurrentProject: setActiveProject,
     tasks,
     stories,
     sprints,
@@ -407,7 +474,10 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     bulkAssignTasksToSprint,
     getBacklogTasks,
     getSprintTasks,
-    getCurrentSprint
+    getCurrentSprint,
+    getProjectTasks,
+    getProjectStories,
+    getProjectSprints
   };
 
   return (

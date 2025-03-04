@@ -1,12 +1,13 @@
 import React from 'react';
 import { Search, Bell, Settings } from 'lucide-react';
+import ProjectSelector from './ProjectSelector';
 
 const Header = () => {
   return (
     <header className="bg-white border-b border-gray-200 py-4 px-6 flex items-center justify-between">
       <div className="flex items-center w-1/3">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1 /2 text-gray-400" size={18} />
           <input
             type="text"
             placeholder="Search..."
@@ -15,6 +16,7 @@ const Header = () => {
         </div>
       </div>
       <div className="flex items-center space-x-4">
+        <ProjectSelector />
         <button className="p-2 rounded-full hover:bg-gray-100">
           <Bell size={20} className="text-gray-600" />
         </button>
