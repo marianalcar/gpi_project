@@ -1,6 +1,7 @@
 import React from 'react';
 import { Search, Bell, Settings, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import ProjectSelector from './ProjectSelector';
 
 const Header = () => {
   const { user, signOut } = useAuth();
@@ -26,6 +27,7 @@ const Header = () => {
         </div>
       </div>
       <div className="flex items-center space-x-4">
+      <ProjectSelector />
         <button className="p-2 rounded-full hover:bg-gray-100">
           <Bell size={20} className="text-gray-600" />
         </button>

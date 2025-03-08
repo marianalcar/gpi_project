@@ -5,6 +5,7 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 
 // Context Providers
 import { AuthProvider } from './context/AuthContext';
+import { ProjectProvider } from './context/ProjectContext';
 import { ScrumProvider } from './context/ScrumContext';
 
 // Components
@@ -19,25 +20,28 @@ import PrivateRoute from './components/PrivateRoute';
 
 function App() {
   return (
-    <AuthProvider>
-      <ScrumProvider>
-        <DndProvider backend={HTML5Backend}>
-          <Router>
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
-                <Route index element={<Dashboard />} />
-                <Route path="product-backlog" element={<ProductBacklog />} />
-                <Route path="sprint-planning" element={<SprintPlanning />} />
-                <Route path="current-sprint" element={<CurrentSprint />} />
-                <Route path="reports" element={<Reports />} />
-              </Route>
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Router>
-        </DndProvider>
-      </ScrumProvider>
-    </AuthProvider>
+    <Router>
+      <AuthProvider>
+        <ProjectProvider> {/* Ensuring ProjectContext wraps ScrumContext */}
+          <ScrumProvider>
+            <DndProvider backend={HTML5Backend}>
+              <Routes>
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/auth/callback" element={<Auth />} />
+                <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
+                  <Route index element={<Dashboard />} />
+                  <Route path="product-backlog" element={<ProductBacklog />} />
+                  <Route path="sprint-planning" element={<SprintPlanning />} />
+                  <Route path="current-sprint" element={<CurrentSprint />} />
+                  <Route path="reports" element={<Reports />} />
+                </Route>
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </DndProvider>
+          </ScrumProvider>
+        </ProjectProvider>
+      </AuthProvider>
+    </Router>
   );
 }
 
