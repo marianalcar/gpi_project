@@ -1,6 +1,6 @@
 # Logs
-
 node_modules
-
-
+dist
+.env
+vite-env.d.ts
 # Editor directories and files
