@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { v4 as uuidv4 } from 'uuid';
-import { format, addDays } from 'date-fns';
+import { supabase } from '../lib/supabase'; // Import Supabase client
+import { useProject } from './ProjectContext'; // Importing Project Context
 
-// Define types
+// Define types -> this matchess the SQL tables defined in SUPABASE
 export interface Task {
   id: string;
   title: string;
@@ -35,459 +35,245 @@ export interface Sprint {
   goal: string;
   capacity: number;
   status: 'Planned' | 'In Progress' | 'Completed';
-  tasks: Task[];
   projectId: string;
 }
 
-export interface Project {
-  id: string;
-  title: string;
-  description: string;
-  startDate: string;
-  estimatedDuration: number; // in weeks
-  sprintDuration: number; // in weeks
-  createdAt: string;
-  status: 'Active' | 'Completed' | 'On Hold';
-}
-
 interface ScrumContextType {
-  // Project operations
-  projects: Project[];
-  currentProject: Project | null;
-  addProject: (project: Omit<Project, 'id' | 'createdAt'>) => void;
-  updateProject: (project: Project) => void;
-  deleteProject: (projectId: string) => void;
-  setCurrentProject: (projectId: string) => void;
-  
-  // Data
   tasks: Task[];
   stories: Story[];
   sprints: Sprint[];
-  
-  // Task operations
-  addTask: (task: Omit<Task, 'id' | 'createdAt' | 'projectId'>) => void;
-  updateTask: (task: Task) => void;
-  deleteTask: (taskId: string) => void;
-  assignTaskToStory: (taskId: string, storyId: string) => void;
-  removeTaskFromStory: (taskId: string) => void;
-  assignTaskToSprint: (taskId: string, sprintId: string) => void;
-  removeTaskFromSprint: (taskId: string) => void;
-  moveTaskStatus: (taskId: string, newStatus: Task['status']) => void;
-  
-  // Story operations
-  addStory: (story: Omit<Story, 'id' | 'createdAt' | 'projectId'>) => void;
-  updateStory: (story: Story) => void;
-  deleteStory: (storyId: string) => void;
-  
-  // Sprint operations
-  addSprint: (sprint: Omit<Sprint, 'id' | 'tasks' | 'projectId'>) => void;
-  updateSprint: (sprint: Sprint) => void;
-  deleteSprint: (sprintId: string) => void;
-  
-  // Bulk operations
-  bulkAssignTasksToSprint: (taskIds: string[], sprintId: string) => void;
-  
-  // Utility functions
+  fetchTasks: () => Promise<void>; //these are now added here to refetch
+  fetchStories: () => Promise<void>;// all objects when project is switched
+  fetchSprints: () => Promise<void>;//now changed dynamically instead
+
+  addTask: (task: Omit<Task, 'id' | 'createdAt'>) => Promise<void>;
+  updateTask: (task: Task) => Promise<void>;
+  deleteTask: (taskId: string) => Promise<void>;
+  addStory: (story: Omit<Story, 'id' | 'createdAt'>) => Promise<void>;
+  updateStory: (story: Story) => Promise<void>;
+  deleteStory: (storyId: string) => Promise<void>;
+  addSprint: (sprint: Omit<Sprint, 'id'>) => Promise<void>;
+  updateSprint: (sprint: Sprint) => Promise<void>;
+  deleteSprint: (sprintId: string) => Promise<void>;
+  assignTaskToStory: (taskId: string, storyId: string) => Promise<void>;
+  removeTaskFromStory: (taskId: string) => Promise<void>;
+  assignTaskToSprint: (taskId: string, sprintId: string) => Promise<void>;
+  removeTaskFromSprint: (taskId: string) => Promise<void>;
+  moveTaskStatus: (taskId: string, newStatus: Task['status']) => Promise<void>;
+  bulkAssignTasksToSprint: (taskIds: string[], sprintId: string) => Promise<void>;
   getBacklogTasks: () => Task[];
   getSprintTasks: (sprintId: string) => Task[];
   getCurrentSprint: () => Sprint | undefined;
-  getProjectTasks: (projectId: string) => Task[];
-  getProjectStories: (projectId: string) => Story[];
-  getProjectSprints: (projectId: string) => Sprint[];
 }
-
-// Initial data
-const initialProjects: Project[] = [
-  {
-    id: uuidv4(),
-    title: 'E-commerce Platform',
-    description: 'Building a modern e-commerce platform with React and Node.js',
-    startDate: '2025-03-15',
-    estimatedDuration: 12,
-    sprintDuration: 2,
-    createdAt: '2025-03-15',
-    status: 'Active'
-  }
-];
-
-const initialTasks: Task[] = [
-  {
-    id: uuidv4(),
-    title: 'Implement user authentication',
-    description: 'Create login and registration functionality with JWT authentication',
-    priority: 'High',
-    storyPoints: 8,
-    status: 'Ready',
-    createdAt: '2025-03-15',
-    assignee: 'Alex Johnson',
-    projectId: initialProjects[0].id
-  },
-  {
-    id: uuidv4(),
-    title: 'Design dashboard layout',
-    description: 'Create responsive dashboard with key metrics and visualizations',
-    priority: 'Medium',
-    storyPoints: 5,
-    status: 'Ready',
-    createdAt: '2025-03-16',
-    assignee: 'Emily Davis',
-    projectId: initialProjects[0].id
-  }
-];
-
-const initialStories: Story[] = [
-  {
-    id: uuidv4(),
-    title: 'User Authentication',
-    description: 'All features related to user authentication and authorization',
-    createdAt: '2025-03-14',
-    status: 'Ready',
-    projectId: initialProjects[0].id
-  },
-  {
-    id: uuidv4(),
-    title: 'Dashboard Features',
-    description: 'Dashboard layout and visualization components',
-    createdAt: '2025-03-15',
-    status: 'New',
-    projectId: initialProjects[0].id
-  }
-];
-
-const initialSprints: Sprint[] = [
-  {
-    id: uuidv4(),
-    name: 'Sprint 1',
-    description: 'Focus on authentication and dashboard features',
-    startDate: format(new Date(), 'yyyy-MM-dd'),
-    endDate: format(addDays(new Date(), 14), 'yyyy-MM-dd'),
-    goal: 'Complete user authentication and dashboard features',
-    capacity: 40,
-    status: 'In Progress',
-    projectId: initialProjects[0].id,
-    tasks: []
-  }
-];
 
 // Create context
 const ScrumContext = createContext<ScrumContextType | undefined>(undefined);
 
-// Provider component
+// Provider component -> this initiates the entire Context on app startup
 export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Load data from localStorage or use initial data
-  const [projects, setProjects] = useState<Project[]>(() => {
-    const savedProjects = localStorage.getItem('scrumProjects');
-    return savedProjects ? JSON.parse(savedProjects) : initialProjects;
-  });
-  
-  const [currentProject, setCurrentProject] = useState<Project | null>(() => {
-    const savedCurrentProjectId = localStorage.getItem('currentProjectId');
-    if (savedCurrentProjectId) {
-      return projects.find(p => p.id === savedCurrentProjectId) || projects[0];
-    }
-    return projects[0];
-  });
-  
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    const savedTasks = localStorage.getItem('scrumTasks');
-    return savedTasks ? JSON.parse(savedTasks) : initialTasks;
-  });
-  
-  const [stories, setStories] = useState<Story[]>(() => {
-    const savedStories = localStorage.getItem('scrumStories');
-    return savedStories ? JSON.parse(savedStories) : initialStories;
-  });
-  
-  const [sprints, setSprints] = useState<Sprint[]>(() => {
-    const savedSprints = localStorage.getItem('scrumSprints');
-    return savedSprints ? JSON.parse(savedSprints) : initialSprints;
-  });
+  const { currentProject } = useProject(); // Get selected project
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [stories, setStories] = useState<Story[]>([]);
+  const [sprints, setSprints] = useState<Sprint[]>([]);
 
-  // Save to localStorage whenever data changes
-  useEffect(() => {
-    localStorage.setItem('scrumProjects', JSON.stringify(projects));
-  }, [projects]);
-  
-  useEffect(() => {
-    if (currentProject) {
-      localStorage.setItem('currentProjectId', currentProject.id);
-    }
-  }, [currentProject]);
-  
-  useEffect(() => {
-    localStorage.setItem('scrumTasks', JSON.stringify(tasks));
-  }, [tasks]);
-  
-  useEffect(() => {
-    localStorage.setItem('scrumStories', JSON.stringify(stories));
-  }, [stories]);
-  
-  useEffect(() => {
-    localStorage.setItem('scrumSprints', JSON.stringify(sprints));
-  }, [sprints]);
-
-  // Project operations
-  const addProject = (project: Omit<Project, 'id' | 'createdAt'>) => {
-    const newProject: Project = {
-      ...project,
-      id: uuidv4(),
-      createdAt: format(new Date(), 'yyyy-MM-dd')
-    };
-    setProjects([...projects, newProject]);
-    if (!currentProject) {
-      setCurrentProject(newProject);
-    }
-  };
-
-  const updateProject = (updatedProject: Project) => {
-    setProjects(projects.map(project => 
-      project.id === updatedProject.id ? updatedProject : project
-    ));
-    if (currentProject?.id === updatedProject.id) {
-      setCurrentProject(updatedProject);
-    }
-  };
-
-  const deleteProject = (projectId: string) => {
-    // Delete all related tasks, stories, and sprints
-    setTasks(tasks.filter(task => task.projectId !== projectId));
-    setStories(stories.filter(story => story.projectId !== projectId));
-    setSprints(sprints.filter(sprint => sprint.projectId !== projectId));
-    
-    // Delete the project
-    setProjects(projects.filter(project => project.id !== projectId));
-    
-    // If current project is deleted, switch to another project
-    if (currentProject?.id === projectId) {
-      const remainingProjects = projects.filter(project => project.id !== projectId);
-      setCurrentProject(remainingProjects.length > 0 ? remainingProjects[0] : null);
-    }
-  };
-
-  const setActiveProject = (projectId: string) => {
-    const project = projects.find(p => p.id === projectId);
-    if (project) {
-      setCurrentProject(project);
-    }
-  };
-
-  // Task operations
-  const addTask = (task: Omit<Task, 'id' | 'createdAt' | 'projectId'>) => {
+  /**
+   * Fetch tasks from Supabase on component mount
+   */
+  const fetchTasks = async () => {
     if (!currentProject) return;
-    
-    const newTask: Task = {
-      ...task,
-      id: uuidv4(),
-      createdAt: format(new Date(), 'yyyy-MM-dd'),
-      projectId: currentProject.id
-    };
-    setTasks([...tasks, newTask]);
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('projectId', currentProject.id); // Fetch only current proj task
+    if (error) console.error('Error fetching tasks:', error);
+    else setTasks(data || []);
   };
-
-  const updateTask = (updatedTask: Task) => {
-    setTasks(tasks.map(task => 
-      task.id === updatedTask.id ? updatedTask : task
-    ));
-  };
-
-  const deleteTask = (taskId: string) => {
-    setTasks(tasks.filter(task => task.id !== taskId));
-  };
-
-  const assignTaskToStory = (taskId: string, storyId: string) => {
-    setTasks(tasks.map(task => 
-      task.id === taskId ? { ...task, storyId } : task
-    ));
-  };
-
-  const removeTaskFromStory = (taskId: string) => {
-    setTasks(tasks.map(task => 
-      task.id === taskId ? { ...task, storyId: undefined } : task
-    ));
-  };
-
-  const assignTaskToSprint = (taskId: string, sprintId: string) => {
-    const task = tasks.find(t => t.id === taskId);
-    if (!task) return;
-    
-    const updatedTask = { 
-      ...task, 
-      sprintId, 
-      status: 'To Do' as Task['status']
-    };
-    
-    setTasks(tasks.map(t => 
-      t.id === taskId ? updatedTask : t
-    ));
-  };
-
-  const removeTaskFromSprint = (taskId: string) => {
-    const task = tasks.find(t => t.id === taskId);
-    if (!task) return;
-    
-    const updatedTask = { 
-      ...task, 
-      sprintId: undefined, 
-      status: task.status === 'To Do' || task.status === 'In Progress' || task.status === 'Review' || task.status === 'Done' 
-        ? 'Ready' as Task['status'] 
-        : task.status
-    };
-    
-    setTasks(tasks.map(t => 
-      t.id === taskId ? updatedTask : t
-    ));
-  };
-
-  const moveTaskStatus = (taskId: string, newStatus: Task['status']) => {
-    setTasks(tasks.map(task => 
-      task.id === taskId ? { ...task, status: newStatus } : task
-    ));
-  };
-
-  // Story operations
-  const addStory = (story: Omit<Story, 'id' | 'createdAt' | 'projectId'>) => {
+  /**
+   * Fetch sprints from Supabase
+   */
+  const fetchSprints = async () => {
     if (!currentProject) return;
-    
-    const newStory: Story = {
-      ...story,
-      id: uuidv4(),
-      createdAt: format(new Date(), 'yyyy-MM-dd'),
-      projectId: currentProject.id
-    };
-    setStories([...stories, newStory]);
+    const { data, error } = await supabase
+      .from('sprints')
+      .select('*')
+      .eq('projectId', currentProject.id);
+    if (error) console.error('Error fetching sprints:', error);
+    else setSprints(data || []);
   };
 
-  const updateStory = (updatedStory: Story) => {
-    setStories(stories.map(story => 
-      story.id === updatedStory.id ? updatedStory : story
-    ));
-  };
-
-  const deleteStory = (storyId: string) => {
-    setStories(stories.filter(story => story.id !== storyId));
-    setTasks(tasks.map(task => 
-      task.storyId === storyId ? { ...task, storyId: undefined } : task
-    ));
-  };
-
-  // Sprint operations
-  const addSprint = (sprint: Omit<Sprint, 'id' | 'tasks' | 'projectId'>) => {
+  /**
+   * Fetch stories from Supabase
+   */
+  const fetchStories = async () => {
     if (!currentProject) return;
-    
-    const newSprint: Sprint = {
-      ...sprint,
-      id: uuidv4(),
-      tasks: [],
-      projectId: currentProject.id
-    };
-    setSprints([...sprints, newSprint]);
+    const { data, error } = await supabase
+      .from('stories')
+      .select('*')
+      .eq('projectId', currentProject.id);
+    if (error) console.error('Error fetching stories:', error);
+    else setStories(data || []);
   };
 
-  const updateSprint = (updatedSprint: Sprint) => {
-    setSprints(sprints.map(sprint => 
-      sprint.id === updatedSprint.id ? updatedSprint : sprint
-    ));
+  // Fetch all data from Supabase when app loads, populates the context of the APP
+  useEffect(() => {
+    fetchTasks();
+    fetchSprints();
+    fetchStories();
+  }, [currentProject]); // Refetch all objects when project changes
+            
+            // CRUD Operations for Tasks
+  /**  
+   * Add a new task to Supabase
+   */
+  const addTask = async (task: Omit<Task, 'id' | 'createdAt' | 'projectId'>) => {
+    if (!currentProject) return;
+    const newTask = { ...task, createdAt: new Date().toISOString(), projectId: currentProject.id };
+  
+    const { data, error } = await supabase.from('tasks').insert([newTask]).select();
+    if (error) console.error('Error adding task:', error);
+    else setTasks([...tasks, data[0]]);
+  };
+  /**
+   * Update an existing task in Supabase
+   */
+  const updateTask = async (updatedTask: Task) => {
+    if (!currentProject) return;
+    const { error } = await supabase
+      .from('tasks')
+      .update(updatedTask)
+      .eq('id', updatedTask.id)
+      .eq('projectId', currentProject.id); // Ensure task belongs to selected project
+    if (error) console.error('Error updating task:', error);
+    else setTasks(tasks.map(task => (task.id === updatedTask.id ? updatedTask : task)));
   };
 
-  const deleteSprint = (sprintId: string) => {
-    setSprints(sprints.filter(sprint => sprint.id !== sprintId));
-    setTasks(tasks.map(task => 
-      task.sprintId === sprintId 
-        ? { 
-            ...task, 
-            sprintId: undefined, 
-            status: task.status === 'To Do' || task.status === 'In Progress' || task.status === 'Review' || task.status === 'Done' 
-              ? 'Ready' as Task['status'] 
-              : task.status
-          } 
-        : task
-    ));
+  /**
+   * Delete a task from Supabase
+   */
+  const deleteTask = async (taskId: string) => {
+    if (!currentProject) return;
+    const { error } = await supabase.from('tasks').delete().eq('id', taskId).eq('projectId', currentProject.id);
+    if (error) console.error('Error deleting task:', error);
+    else setTasks(tasks.filter(task => task.id !== taskId));
   };
 
-  // Bulk operations
-  const bulkAssignTasksToSprint = (taskIds: string[], sprintId: string) => {
-    setTasks(tasks.map(task => 
-      taskIds.includes(task.id) 
-        ? { 
-            ...task, 
-            sprintId, 
-            status: 'To Do' as Task['status']
-          } 
-        : task
-    ));
+      // CRUD Operations for Stories
+  /**
+   * Add a new story to Supabase
+   */
+  const addStory = async (story: Omit<Story, 'id' | 'createdAt' | 'projectId'>) => {
+    if (!currentProject) return;
+    const newStory = { ...story, createdAt: new Date().toISOString(), projectId: currentProject.id };
+  
+    const { data, error } = await supabase.from('stories').insert([newStory]).select();
+    if (error) console.error('Error adding story:', error);
+    else setStories([...stories, data[0]]);
+  };
+  
+  /**
+   * Update an existing story in Supabase
+   */
+  const updateStory = async (updatedStory: Story) => {
+    if (!currentProject) return;
+    const { error } = await supabase
+      .from('stories')
+      .update(updatedStory)
+      .eq('id', updatedStory.id)
+      .eq('projectId', currentProject.id); // Ensure story belongs to selected project
+    if (error) console.error('Error updating story:', error);
+    else setStories(stories.map(story => (story.id === updatedStory.id ? updatedStory : story)));
+  };
+  /**
+   * Delete a story from Supabase
+   */
+  const deleteStory = async (storyId: string) => {
+    if (!currentProject) return;
+    const { error } = await supabase.from('stories').delete().eq('id', storyId).eq('projectId', currentProject.id);
+    if (error) console.error('Error deleting story:', error);
+    else setStories(stories.filter(story => story.id !== storyId));
   };
 
-  // Utility functions
-  const getBacklogTasks = () => {
-    if (!currentProject) return [];
-    return tasks.filter(task => !task.sprintId && task.projectId === currentProject.id);
+        // CRUD Operations for Sprints
+  /**
+   * Add a new sprint to Supabase
+   */
+  const addSprint = async (sprint: Omit<Sprint, 'id' | 'projectId'>) => {
+    if (!currentProject) return;
+    const newSprint = { ...sprint, projectId: currentProject.id };
+  
+    const { data, error } = await supabase.from('sprints').insert([newSprint]).select();
+    if (error) console.error('Error adding sprint:', error);
+    else setSprints([...sprints, data[0]]);
+  };
+  /**
+   * Update an existing sprint in Supabase
+   */
+  const updateSprint = async (updatedSprint: Sprint) => {
+    if (!currentProject) return;
+    const { error } = await supabase
+      .from('sprints')
+      .update(updatedSprint)
+      .eq('id', updatedSprint.id)
+      .eq('projectId', currentProject.id); // Ensure sprint belongs to selected project
+    if (error) console.error('Error updating sprint:', error);
+    else setSprints(sprints.map(sprint => (sprint.id === updatedSprint.id ? updatedSprint : sprint)));
+  };
+  /**
+   * Delete a sprint from Supabase
+   */
+  const deleteSprint = async (sprintId: string) => {
+    if (!currentProject) return;
+    const { error } = await supabase.from('sprints').delete().eq('id', sprintId).eq('projectId', currentProject.id);
+    if (error) console.error('Error deleting sprint:', error);
+    else setSprints(sprints.filter(sprint => sprint.id !== sprintId));
   };
 
-  const getSprintTasks = (sprintId: string) => {
-    if (!currentProject) return [];
-    return tasks.filter(task => task.sprintId === sprintId && task.projectId === currentProject.id);
+  // Dragging, Assigning & Removing Tasks
+  const assignTaskToStory = async (taskId: string, storyId: string) => {
+    await updateTask({ ...tasks.find(t => t.id === taskId)!, storyId });
   };
 
-  const getCurrentSprint = () => {
-    if (!currentProject) return undefined;
-    return sprints.find(sprint => 
-      sprint.status === 'In Progress' && sprint.projectId === currentProject.id
-    );
+  const removeTaskFromStory = async (taskId: string) => {
+    await updateTask({ ...tasks.find(t => t.id === taskId)!, storyId: undefined });
   };
 
-  const getProjectTasks = (projectId: string) => {
-    return tasks.filter(task => task.projectId === projectId);
+  const assignTaskToSprint = async (taskId: string, sprintId: string) => {
+    await updateTask({ ...tasks.find(t => t.id === taskId)!, sprintId, status: 'To Do' });
   };
 
-  const getProjectStories = (projectId: string) => {
-    return stories.filter(story => story.projectId === projectId);
+  const removeTaskFromSprint = async (taskId: string) => {
+    await updateTask({ ...tasks.find(t => t.id === taskId)!, sprintId: undefined, status: 'Ready' });
   };
 
-  const getProjectSprints = (projectId: string) => {
-    return sprints.filter(sprint => sprint.projectId === projectId);
+  const moveTaskStatus = async (taskId: string, newStatus: Task['status']) => {
+    await updateTask({ ...tasks.find(t => t.id === taskId)!, status: newStatus });
   };
 
-  const value = {
-    projects,
-    currentProject,
-    addProject,
-    updateProject,
-    deleteProject,
-    setCurrentProject: setActiveProject,
-    tasks,
-    stories,
-    sprints,
-    addTask,
-    updateTask,
-    deleteTask,
-    assignTaskToStory,
-    removeTaskFromStory,
-    assignTaskToSprint,
-    removeTaskFromSprint,
-    moveTaskStatus,
-    addStory,
-    updateStory,
-    deleteStory,
-    addSprint,
-    updateSprint,
-    deleteSprint,
-    bulkAssignTasksToSprint,
-    getBacklogTasks,
-    getSprintTasks,
-    getCurrentSprint,
-    getProjectTasks,
-    getProjectStories,
-    getProjectSprints
+  const bulkAssignTasksToSprint = async (taskIds: string[], sprintId: string) => {
+    for (const taskId of taskIds) {
+      await assignTaskToSprint(taskId, sprintId);
+    }
   };
+
+  // Utility Functions
+  const getBacklogTasks = () => tasks.filter(task => !task.sprintId && task.projectId === currentProject?.id);
+
+const getSprintTasks = (sprintId: string) => tasks.filter(task => task.sprintId === sprintId && task.projectId === currentProject?.id);
+
+const getCurrentSprint = () => sprints.find(sprint => sprint.status === 'In Progress' && sprint.projectId === currentProject?.id);
 
   return (
-    <ScrumContext.Provider value={value}>
+    <ScrumContext.Provider value={{
+      tasks, stories, sprints, fetchTasks, fetchStories, fetchSprints, addTask, updateTask, deleteTask, addStory, updateStory, deleteStory, addSprint, updateSprint, deleteSprint,
+      assignTaskToStory, removeTaskFromStory, assignTaskToSprint, removeTaskFromSprint, moveTaskStatus, bulkAssignTasksToSprint,
+      getBacklogTasks, getSprintTasks, getCurrentSprint
+    }}>
       {children}
     </ScrumContext.Provider>
   );
 };
 
-// Custom hook for using the context
+// Custom hook for using the context, now 20% cooler!
 export const useScrumContext = () => {
   const context = useContext(ScrumContext);
   if (context === undefined) {

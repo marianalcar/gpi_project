@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { Plus, Filter, Search, MoreVertical, AlertCircle, Clock, CheckCircle2, Trash2, FolderOpen, X } from 'lucide-react';
 import { useScrumContext, Task, Story } from '../context/ScrumContext';
+import { useProject } from '../context/ProjectContext';
 
 // Item types for drag and drop
 const ItemTypes = {
@@ -13,7 +14,9 @@ const ProductBacklog = () => {
   // Get data and functions from context
   const { 
     tasks, 
-    stories, 
+    stories,
+    fetchTasks,
+    fetchStories, 
     addTask, 
     updateTask, 
     deleteTask, 
@@ -23,6 +26,12 @@ const ProductBacklog = () => {
     removeTaskFromStory,
     getBacklogTasks
   } = useScrumContext();
+  const { currentProject } = useProject(); // Get selected project
+  useEffect(() => {
+    fetchTasks();
+    fetchStories();
+  }, [currentProject]); // Re-fetch when project changes
+  //why do we need project context here, to know when theres a project change
 
   // Get only backlog tasks (not assigned to any sprint)
   const backlogItems = getBacklogTasks();
@@ -56,7 +65,8 @@ const ProductBacklog = () => {
   // Handle adding a task
   const handleAddTask = () => {
     if (!newTask.title) return;
-    
+    // if (!newTask.title || !currentProject) return; // Ensure a project is selected
+    //console.log(currentProject.id);
     addTask({
       title: newTask.title,
       description: newTask.description || '',
@@ -64,7 +74,8 @@ const ProductBacklog = () => {
       storyPoints: newTask.storyPoints || 0,
       status: newTask.status as 'New' | 'Ready' | 'In Sprint',
       assignee: newTask.assignee,
-      storyId: newTask.storyId
+      storyId: newTask.storyId,
+      projectId: currentProject.id //Legit unecessary, i was desperate.
     });
     
     setNewTask({
@@ -85,6 +96,7 @@ const ProductBacklog = () => {
       title: newStory.title,
       description: newStory.description || '',
       status: newStory.status as 'New' | 'Ready' | 'In Sprint',
+      projectId: currentProject.id //somehow also not needed.
     });
     
     setNewStory({

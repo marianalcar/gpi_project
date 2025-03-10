@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { 
   CheckCircle2, 
@@ -9,6 +9,7 @@ import {
   Plus,
   Filter
 } from 'lucide-react';
+import { useProject } from '../context/ProjectContext'; 
 import { useScrumContext, Task } from '../context/ScrumContext';
 
 // Item types for drag and drop
@@ -17,15 +18,16 @@ const ItemTypes = {
 };
 
 const CurrentSprint = () => {
-  const { 
-    tasks, 
-    sprints, 
-    getCurrentSprint, 
-    moveTaskStatus, 
-    updateTask 
-  } = useScrumContext();
+  const { tasks, sprints, getCurrentSprint, moveTaskStatus, updateTask, fetchTasks, fetchSprints } = useScrumContext();
+  const { currentProject } = useProject(); // Get selected project
+
+  useEffect(() => {
+    fetchTasks();
+    fetchSprints();
+  }, [currentProject]); // Re-fetch when project changes
   
   // Get current sprint
+  
   const currentSprint = getCurrentSprint();
   
   // Filter tasks for current sprint

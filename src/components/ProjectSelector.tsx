@@ -1,25 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronDown, Plus, Edit3, Trash2, AlertCircle } from 'lucide-react';
-import { useScrumContext, Project } from '../context/ScrumContext';
-import { format, addWeeks } from 'date-fns';
+import { format } from 'date-fns';
+import { supabase } from '../lib/supabase';
+import { useProject } from '../context/ProjectContext';
+
+
+interface Project {
+  id: string;
+  name: string;
+  description: string;
+  startDate: string;
+  estimatedDuration: number;
+  sprintDuration: number;
+  status: 'Active' | 'Completed' | 'On Hold';
+  createdAt: string;
+  createdBy: string;
+}
 
 const ProjectSelector = () => {
-  const { 
-    projects, 
-    currentProject, 
-    setCurrentProject, 
-    addProject, 
-    updateProject, 
-    deleteProject 
-  } = useScrumContext();
-
+  const [projects, setProjects] = useState<Project[]>([]);
+  const { currentProject, setCurrentProject } = useProject();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  
   const [formData, setFormData] = useState({
-    title: '',
+    name: '',
     description: '',
     startDate: format(new Date(), 'yyyy-MM-dd'),
     estimatedDuration: 12,
@@ -27,11 +33,37 @@ const ProjectSelector = () => {
     status: 'Active' as const
   });
 
-  const handleOpenModal = (project?: Project) => {
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  const fetchProjects = async () => {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('*')
+      .order('createdAt', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching projects:', error);
+    } else {
+      setProjects(data || []);
+      // Set first project as current if none selected
+      if (!currentProject && data && data.length > 0) {
+        setCurrentProject(data[0]);
+      }
+    }
+  };
+
+  const handleProjectChange = (project: Project) => {
+    setCurrentProject(project); //Updates global context
+    setIsDropdownOpen(false);
+  };
+
+  const handleOpenModal = (project: Project | null = null) => {
     if (project) {
       setEditingProject(project);
       setFormData({
-        title: project.title,
+        name: project.name,
         description: project.description,
         startDate: project.startDate,
         estimatedDuration: project.estimatedDuration,
@@ -41,7 +73,7 @@ const ProjectSelector = () => {
     } else {
       setEditingProject(null);
       setFormData({
-        title: '',
+        name: '',
         description: '',
         startDate: format(new Date(), 'yyyy-MM-dd'),
         estimatedDuration: 12,
@@ -53,23 +85,66 @@ const ProjectSelector = () => {
     setIsDropdownOpen(false);
   };
 
-  const handleSubmit = () => {
-    if (editingProject) {
-      updateProject({
-        ...editingProject,
-        ...formData
-      });
-    } else {
-      addProject(formData);
+  const handleSubmit = async () => {
+    try {
+      if (editingProject) {
+        const { error } = await supabase
+          .from('projects')
+          .update(formData)
+          .eq('id', editingProject.id);
+
+        if (error) throw error;
+
+        // Update current project if it was the one being edited
+        /*if (currentProject?.id === editingProject.id) {
+          setCurrentProject({ ...editingProject, ...formData });
+        }*/
+      } else {
+        const { data, error } = await supabase
+          .from('projects')
+          .insert([{ ...formData, createdBy: (await supabase.auth.getUser()).data.user?.id }])
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        // Set as current project if it's the first one
+        if (projects.length === 0) {
+          setCurrentProject(data);
+        }
+      }
+
+      setIsModalOpen(false);
+      fetchProjects();
+    } catch (error) {
+      console.error('Error saving project:', error);
+      // Here you would typically show an error message to the user
     }
-    setIsModalOpen(false);
   };
 
-  const handleDeleteProject = () => {
+  const handleDeleteProject = async () => {
     if (editingProject) {
-      deleteProject(editingProject.id);
-      setIsDeleteConfirmOpen(false);
-      setIsModalOpen(false);
+      try {
+        const { error } = await supabase
+          .from('projects')
+          .delete()
+          .eq('id', editingProject.id);
+
+        if (error) throw error;
+
+        // If deleted project was current, set first remaining project as current
+        if (currentProject?.id === editingProject.id) {
+          const remainingProjects = projects.filter(p => p.id !== editingProject.id);
+          setCurrentProject(remainingProjects[0] || null);
+        }
+
+        setIsDeleteConfirmOpen(false);
+        setIsModalOpen(false);
+        fetchProjects();
+      } catch (error) {
+        console.error('Error deleting project:', error);
+        // Here you would typically show an error message to the user
+      }
     }
   };
 
@@ -95,7 +170,7 @@ const ProjectSelector = () => {
         >
           <div className="flex flex-col items-start">
             <span className="text-xs text-gray-500">Current Project</span>
-            <span className="font-medium">{currentProject?.title || 'Select Project'}</span>
+            <span className="font-medium">{currentProject?.name || 'Select Project'}</span>
           </div>
           <ChevronDown size={16} className="text-gray-500" />
         </button>
@@ -119,18 +194,17 @@ const ProjectSelector = () => {
                 >
                   <button
                     onClick={() => {
-                      setCurrentProject(project.id);
-                      setIsDropdownOpen(false);
+                      handleProjectChange(project)
                     }}
                     className="flex-1 flex items-center text-left px-2"
                   >
                     <div>
-                      <div className="font-medium text-gray-900">{project.title}</div>
+                      <div className="font-medium text-gray-900">{project.name}</div>
                       <div className="text-sm text-gray-500 truncate max-w-[180px]">
                         {project.description}
                       </div>
                       <div className="mt-1">
-                        <span className={`text-xs px-2 py-1 rounded-full ${getProjectStatusColor(project.status)}`}>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getProjectStatusColor(project.status)}`}>
                           {project.status}
                         </span>
                       </div>
@@ -164,13 +238,13 @@ const ProjectSelector = () => {
               </h2>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Project Title</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Project name</label>
                   <input
                     type="text"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="Enter project title"
+                    placeholder="Enter project name"
                   />
                 </div>
                 <div>

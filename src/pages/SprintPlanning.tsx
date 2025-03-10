@@ -90,7 +90,7 @@ const SprintPlanning = () => {
         goal: newSprint.goal || '',
         capacity: newSprint.capacity || 40,
         status: newSprint.status as 'Planned' | 'In Progress' | 'Completed'
-      });
+      });//somehow this works without having a project.id  :V
     }
     
     // Reset form and close modal
