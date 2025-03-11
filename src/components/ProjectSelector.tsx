@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronDown, Plus, Edit3, Trash2, AlertCircle } from 'lucide-react';
+import { ChevronDown, Plus, Edit3, Trash2, AlertCircle, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '../lib/supabase';
-import { useProject } from '../context/ProjectContext';
+import { FetchMode, useProject } from '../context/ProjectContext';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 
 interface Project {
@@ -19,7 +21,7 @@ interface Project {
 
 const ProjectSelector = () => {
   const [projects, setProjects] = useState<Project[]>([]);
-  const { currentProject, setCurrentProject } = useProject();
+  const { currentProject, setCurrentProject, setFetchMode } = useProject();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
@@ -32,17 +34,26 @@ const ProjectSelector = () => {
     sprintDuration: 2,
     status: 'Active' as const
   });
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
+    setFetchMode(FetchMode.USER_PROJECTS);
     fetchProjects();
   }, []);
 
   const fetchProjects = async () => {
+    if (!user) {
+      console.error('No authenticated user found');
+      return;
+    }
+  
     const { data, error } = await supabase
       .from('projects')
-      .select('*')
+      .select('*, roles!inner (project_id, auth_id, role_type)')
+      .eq('roles.auth_id', user.id)
       .order('createdAt', { ascending: false });
-
+  
     if (error) {
       console.error('Error fetching projects:', error);
     } else {
@@ -177,6 +188,8 @@ const ProjectSelector = () => {
 
         {isDropdownOpen && (
           <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+            {/* Add a search for project button side by side with the Create New Project*/}
+            
             <div className="p-2">
               <button
                 onClick={() => handleOpenModal()}
@@ -185,6 +198,11 @@ const ProjectSelector = () => {
                 <Plus size={16} className="mr-2" />
                 Create New Project
               </button>
+
+              <button className="w-full flex items-center px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 rounded" onClick={() => navigate('/project-search')}>
+                <Search className="mr-2 text-gray-500" size={16} />
+                <span className="text-gray-500">Search for a project</span>
+              </  button>
             </div>
             <div className="border-t border-gray-200">
               {projects.map(project => (

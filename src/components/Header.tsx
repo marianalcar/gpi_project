@@ -1,10 +1,15 @@
 import React from 'react';
 import { Search, Bell, Settings, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import {useProject} from '../context/ProjectContext';
 import ProjectSelector from './ProjectSelector';
 
 const Header = () => {
   const { user, signOut } = useAuth();
+  const {currentRole} = useProject();
+
+  console.log(currentRole);
+  console.log(user);
 
   const handleSignOut = async () => {
     try {
@@ -42,7 +47,7 @@ const Header = () => {
           </div>
           <div>
             <p className="text-sm font-medium">{user?.email}</p>
-            <p className="text-xs text-gray-500">Scrum Master</p>
+            <p className="text-xs text-gray-500">{currentRole}</p>
           </div>
           <button
             onClick={handleSignOut}
