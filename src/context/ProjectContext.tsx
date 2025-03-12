@@ -2,12 +2,18 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '../lib/supabase'; // Import Supabase client
 
+export interface Role_data {
+  project_id: string;
+  auth_id: string;
+  role_type: Role;
+}
 export interface Project {
   id: string;
   name: string;
   description: string | null;
   createdAt: string;
   createdBy: string;
+  roles?: Role_data[];
 }
 
 export enum Role {
@@ -66,7 +72,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           // Load all projects
           query = await supabase
             .from('projects')
-            .select('*')
+            .select('*, roles!left (project_id, auth_id, role_type)')
             .order('createdAt', { ascending: false });
         }
 

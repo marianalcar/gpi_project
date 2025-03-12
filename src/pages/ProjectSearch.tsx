@@ -19,6 +19,7 @@ function ProjectSearch() {
   useEffect(() => {
     setCurrentProject(null);
     setFetchMode(FetchMode.ALL_PROJECTS);
+    console.log("Projects", projects);
     }, []);
 
     const handleJoinProject = async (project) => {
@@ -28,13 +29,19 @@ function ProjectSearch() {
             .insert({
                 project_id: project.id,
                 auth_id: user.id,
-                role: 'DEVELOPER'
+                role_type: 'SCRUM_MASTER'
             });
         } catch (error) {
             console.error('Error joining project:', error);
         }
         navigate('/');
     }
+
+  // Add a function to check if user already has a role in the project
+  const userHasRoleInProject = (project) => {
+    if (!project.roles || !user) return false;
+    return project.roles.some(role => role.auth_id === user.id);
+  };
 
 return (
     <div className="min-h-screen bg-gray-50">
@@ -94,13 +101,18 @@ return (
                       <span>Created: {new Date(project.createdAt).toLocaleDateString()}</span>
                     </div>
                   </div>
-                  <Link to="/" 
-                    className="mt-6 w-full bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors duration-300 flex items-center justify-center gap-2"
+                  <button
+                    className={`mt-6 w-full py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors duration-300 ${
+                      userHasRoleInProject(project) 
+                        ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                        : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                    }`}
                     onClick={() => handleJoinProject(project)}
+                    disabled={userHasRoleInProject(project)}
                   >
-                    Join Project
-                    <ArrowRight size={18} />
-                  </Link>
+                    {userHasRoleInProject(project) ? 'Already Joined' : 'Join Project'}
+                    {!userHasRoleInProject(project) && <ArrowRight size={18} />}
+                  </button>
                 </div>
               </div>
             ))}
