@@ -37,7 +37,7 @@ const ProjectSelector = () => {
 	}, []);
 
 	useEffect(() => {
-		const subscription = supabase
+		const projectSubscription = supabase
 			.channel('projects_realtime')
 			.on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, (payload) => {
 				setProjects(prevProjects => {
@@ -60,7 +60,7 @@ const ProjectSelector = () => {
 			.subscribe();
 
 		return () => {
-			supabase.removeChannel(subscription);
+			supabase.removeChannel(projectSubscription);
 		};
 	}, []);
 
