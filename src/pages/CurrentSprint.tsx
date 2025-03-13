@@ -7,8 +7,11 @@ import {
   ArrowRight, 
   MoreVertical,
   Plus,
+  Calendar,
+  Users,
   Filter
 } from 'lucide-react';
+import { format, addDays } from 'date-fns';
 import { useProject } from '../context/ProjectContext'; 
 import { useScrumContext, Task } from '../context/ScrumContext';
 
@@ -171,53 +174,51 @@ const CurrentSprint = () => {
   };
   
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-800">Current Sprint</h1>
-        <div className="flex space-x-3">
-          <button className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
-            <Filter size={16} />
-            <span>Filter</span>
-          </button>
-          <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-indigo-700 transition-colors">
-            <Plus size={18} className="mr-2" />
-            Add Task
-          </button>
-        </div>
+        <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors">
+          Complete Sprint
+        </button>
       </div>
       
       {currentSprint ? (
         <>
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-800">{currentSprint.name}</h2>
-                <p className="text-gray-500 mt-1">{currentSprint.startDate} to {currentSprint.endDate}</p>
-                <p className="text-gray-700 mt-2">{currentSprint.goal}</p>
-              </div>
-              <div className="flex flex-col items-end">
-                <div className="flex items-center mb-2">
-                  <span className="text-gray-700 mr-2">Tasks:</span>
-                  <span className="font-semibold">{completedTasks}/{totalTasks}</span>
-                  <span className="text-gray-500 ml-2">({progressPercentage}%)</span>
-                </div>
-                <div className="flex items-center">
-                  <span className="text-gray-700 mr-2">Points:</span>
-                  <span className="font-semibold">{completedPoints}/{totalPoints}</span>
-                  <span className="text-gray-500 ml-2">({pointsPercentage}%)</span>
-                </div>
-                <div className="w-64 h-2 bg-gray-200 rounded-full mt-2">
-                  <div 
-                    className="h-2 bg-indigo-600 rounded-full" 
-                    style={{ width: `${pointsPercentage}%` }}
-                  ></div>
-                </div>
+          <div className="bg-white rounded-xl shadow-sm p-4">
+        {/* Compact Sprint Header */}
+        <div className="flex flex-wrap items-center justify-between mb-4">
+          <div className="flex items-center">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800">{currentSprint.name}</h2>
+              <div className="flex items-center text-sm text-gray-500">
+                <Calendar size={14} className="mr-1" />
+                <span>
+                  {format(new Date(currentSprint.startDate), 'MMM d')} - {format(new Date(currentSprint.endDate), 'MMM d, yyyy')}
+                </span>
+                <span className="mx-2">•</span>
+                <span className="flex items-center">
+                  <Users size={14} className="mr-1" />
+                  {currentSprint.capacity} members
+                </span>
               </div>
             </div>
           </div>
+          <div className="flex items-center mt-2 sm:mt-0">
+            <div className="text-sm font-medium text-gray-600 mr-3">
+              <span className="font-bold">{completedPoints}</span> of <span className="font-bold">{totalPoints}</span> points ({progressPercentage}%)
+            </div>
+            <div className="w-32 bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-indigo-600 h-2 rounded-full"
+                style={{ width: `${progressPercentage}%` }}
+              ></div>
+            </div>
+          </div>
+            </div>
+          </div>
           
-          <div className="bg-white rounded-xl shadow-sm p-6 overflow-x-auto">
-            <div className="flex space-x-4 min-w-max">
+          <div className="flex overflow-x-auto pb-2" style={{ minHeight: "calc(100vh - 250px)" }}>
+          <div className="flex space-x-4 w-full">
               <TaskColumn 
                 title="To Do" 
                 tasks={todoTasks} 
