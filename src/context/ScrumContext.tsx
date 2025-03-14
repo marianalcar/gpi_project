@@ -119,6 +119,16 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     fetchTasks();
     fetchSprints();
     fetchStories();
+      
+    const subscription = supabase.channel('scrum_realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, fetchTasks)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'stories' }, fetchStories)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'sprints' }, fetchSprints)
+        .subscribe();
+
+    return () => {
+        supabase.removeChannel(subscription);
+    };
   }, [currentProject]); // Refetch all objects when project changes
             
             // CRUD Operations for Tasks

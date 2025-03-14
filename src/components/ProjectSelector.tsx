@@ -18,20 +18,19 @@ interface Project {
 }
 
 const ProjectSelector = () => {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const { currentProject, setCurrentProject } = useProject();
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    startDate: format(new Date(), 'yyyy-MM-dd'),
-    estimatedDuration: 12,
-    sprintDuration: 2,
-    status: 'Active' as const
-  });
+    const { currentProject, setCurrentProject, projects, setProjects } = useProject();
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+    const [editingProject, setEditingProject] = useState<Project | null>(null);
+    const [formData, setFormData] = useState({
+        name: '',
+        description: '',
+        startDate: format(new Date(), 'yyyy-MM-dd'),
+        estimatedDuration: 12,
+        sprintDuration: 2,
+        status: 'Active' as const
+    });
 
   useEffect(() => {
     fetchProjects();
@@ -40,6 +39,34 @@ const ProjectSelector = () => {
       setCurrentProject(JSON.parse(savedProject));
   }
   }, []);
+    
+    useEffect(() => {
+        const projectSubscription = supabase
+            .channel('projects_realtime')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, (payload) => {
+                setProjects(prevProjects => {
+                    switch (payload.eventType) {
+                        case 'INSERT':
+                            return prevProjects.some(project => project.id === payload.new.id)
+                                ? prevProjects
+                                : [...prevProjects, payload.new as Project];
+                        case 'UPDATE':
+                            return prevProjects.map(project =>
+                                project.id === payload.new.id ? payload.new as Project : project
+                            );
+                        case 'DELETE':
+                            return prevProjects.filter(project => project.id !== payload.old.id);
+                        default:
+                            return prevProjects;
+                    }
+                });
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(projectSubscription);
+        };
+    }, []);
 
   const fetchProjects = async () => {
     const { data, error } = await supabase
