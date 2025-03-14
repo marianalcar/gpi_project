@@ -35,6 +35,10 @@ const ProjectSelector = () => {
 
   useEffect(() => {
     fetchProjects();
+    const savedProject = localStorage.getItem('currentProject');
+    if (savedProject) {
+      setCurrentProject(JSON.parse(savedProject));
+  }
   }, []);
 
   const fetchProjects = async () => {
@@ -47,8 +51,15 @@ const ProjectSelector = () => {
       console.error('Error fetching projects:', error);
     } else {
       setProjects(data || []);
-      // Set first project as current if none selected
-      if (!currentProject && data && data.length > 0) {
+
+      const savedProject = localStorage.getItem('currentProject');
+      if (savedProject) {
+        const parsedProject = JSON.parse(savedProject);
+        const foundProject = data.find((p) => p.id === parsedProject.id);
+        if (foundProject) {
+          setCurrentProject(foundProject);
+        }
+      } else if (!currentProject && data && data.length > 0) { // Set first project as current if none selected
         setCurrentProject(data[0]);
       }
     }
@@ -57,6 +68,7 @@ const ProjectSelector = () => {
   const handleProjectChange = (project: Project) => {
     setCurrentProject(project); //Updates global context
     setIsDropdownOpen(false);
+    localStorage.setItem('currentProject', JSON.stringify(project));
   };
 
   const handleOpenModal = (project: Project | null = null) => {

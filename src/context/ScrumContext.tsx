@@ -242,6 +242,18 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const removeTaskFromSprint = async (taskId: string) => {
+    if (!currentProject) return;
+    const { error, data } = await supabase
+    .from('tasks')
+    .update({ sprintId: null }) // Remove a associação
+    .eq('id', taskId)  // Filtra pela task correta
+    .eq('projectId', currentProject.id); // Garante que pertence ao projeto
+
+    if (error) {
+      console.error("Erro ao remover task do sprint:", error);
+    } else {
+      console.log("Task removida do sprint com sucesso:", data);
+    }
     await updateTask({ ...tasks.find(t => t.id === taskId)!, sprintId: undefined, status: 'Ready' });
   };
 
