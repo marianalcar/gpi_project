@@ -264,7 +264,7 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } else {
       console.log("Task removida do sprint com sucesso:", data);
     }
-    await updateTask({ ...tasks.find(t => t.id === taskId)!, sprintId: undefined, status: 'Ready' });
+    //await updateTask({ ...tasks.find(t => t.id === taskId)!, sprintId: undefined, status: 'Ready' });
   };
 
   const moveTaskStatus = async (taskId: string, newStatus: Task['status']) => {
