@@ -17,6 +17,7 @@ import {
   ArrowUpDown  // Adicione esta importação
 } from 'lucide-react';
 import { useScrumContext, Task, Sprint } from '../context/ScrumContext';
+import { useProject } from '../context/ProjectContext';
 
 // Item types for drag and drop
 const ItemTypes = {
@@ -25,6 +26,7 @@ const ItemTypes = {
 
 const SprintPlanning = () => {
   // Get data and functions from context
+  const { currentProject } = useProject();
   const { 
     tasks, 
     sprints, 
@@ -36,6 +38,9 @@ const SprintPlanning = () => {
     removeTaskFromSprint,
     bulkAssignTasksToSprint
   } = useScrumContext();
+
+  // Get sprint duration from current project and defining default behaviour (default to 2 weeks if undefined)
+  const sprintDuration = currentProject?.sprintDuration || 2;
 
   // State for sprint creation/editing
   const [isSprintModalOpen, setIsSprintModalOpen] = useState(false);
@@ -55,7 +60,7 @@ const SprintPlanning = () => {
     name: '',
     description: '',
     startDate: format(new Date(), 'yyyy-MM-dd'),
-    endDate: format(addDays(new Date(), 14), 'yyyy-MM-dd'),
+    endDate: format(addDays(new Date(), sprintDuration * 7), 'yyyy-MM-dd'),
     goal: '',
     capacity: 40,
     status: 'Planned'
@@ -127,6 +132,18 @@ const SprintPlanning = () => {
     setIsSprintModalOpen(false);
     setIsEditMode(false);
     setSelectedSprintId(null);
+  };
+
+  // Function to handle start date changes
+  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newStartDate = e.target.value;
+    const calculatedEndDate = format(addDays(parseISO(newStartDate), sprintDuration * 7), 'yyyy-MM-dd');
+
+    setNewSprint((prev) => ({
+      ...prev,
+      startDate: newStartDate,
+      endDate: calculatedEndDate // Automatically update end date
+    }));
   };
 
   // Handle editing a sprint
@@ -407,7 +424,7 @@ const SprintPlanning = () => {
               name: '',
               description: '',
               startDate: format(new Date(), 'yyyy-MM-dd'),
-              endDate: format(addDays(new Date(), 14), 'yyyy-MM-dd'),
+              endDate: format(addDays(new Date(), sprintDuration * 7), 'yyyy-MM-dd'),
               goal: '',
               capacity: 40,
               status: 'Planned'
@@ -513,7 +530,10 @@ const SprintPlanning = () => {
                     <input
                       type="date"
                       value={newSprint.startDate || ''}
-                      onChange={(e) => setNewSprint({ ...newSprint, startDate: e.target.value })}
+                      onChange={(e) => {
+                        setNewSprint({ ...newSprint, startDate: e.target.value }); // Keep existing functionality
+                        handleStartDateChange(e); // Call the function to update endDate
+                      }} 
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                     />
                   </div>

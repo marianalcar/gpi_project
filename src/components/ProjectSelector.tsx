@@ -134,10 +134,10 @@ const ProjectSelector = () => {
 
         if (error) throw error;
 
-        // Update current project if it was the one being edited
-        /*if (currentProject?.id === editingProject.id) {
+        // Update current project if it was the one being edited <-  
+        if (currentProject?.id === editingProject.id) {
           setCurrentProject({ ...editingProject, ...formData });
-        }*/
+        }
       } else {
         const { data, error } = await supabase
           .from('projects')
