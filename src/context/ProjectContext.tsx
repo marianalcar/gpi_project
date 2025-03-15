@@ -22,14 +22,11 @@ export enum Role {
   Product_owner = 'PRODUCT_OWNER',
 }
 
-export enum FetchMode {
-  ALL_PROJECTS = 'ALL_PROJECTS',
-  USER_PROJECTS = 'USER_PROJECTS',
-}
 
 interface ProjectContextType {
   currentProject: Project | null;
-  projects: Project[];
+  userProjects: Project[];
+  allProjects: Project[];
   loading: boolean;
   error: string | null;
   createProject: (name: string, description?: string) => Promise<void>;
@@ -38,62 +35,73 @@ interface ProjectContextType {
   setCurrentProject: (project: Project | null) => void;
   currentRole: Role | null;
   setCurrentRole: (role: Role | null) => void;
-  fetchMode: FetchMode;
-  setFetchMode: (mode: FetchMode) => void;
+  loadUserProjects: () => Promise<void>;
+  loadAllProjects: () => Promise<void>;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [userProjects, setUserProjects] = useState<Project[]>([]);
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentRole, setCurrentRole] = useState<Role | null>(null);
-  const [fetchMode, setFetchMode] = useState<FetchMode>(FetchMode.USER_PROJECTS);
+
+  const loadAllProjects = async () => {
+    try {
+          // Load all projects
+          let query = await supabase
+          .from('projects')
+          .select('*, roles!left (project_id, auth_id, role_type)')
+          .order('createdAt', { ascending: false });
+
+          const { data, error } = query;
+
+          if (error) throw error;
+
+          setAllProjects(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load allProjects');
+    }
+  };
 
   // Load projects and set up real-time subscription
-  useEffect(() => {
+  const loadUserProjects = async () => {
     if (!user) return;
 
-    const loadProjects = async () => {
-      try {
-        setLoading(true);
-        let query;
-        
-        if (fetchMode === FetchMode.USER_PROJECTS) {
-          // Load only user's projects
-          query = await supabase
-            .from('projects')
-            .select('*, roles!inner (project_id, auth_id, role_type)')
-            .eq('roles.auth_id', user.id)
-            .order('createdAt', { ascending: false });
-        } else {
-          // Load all projects
-          query = await supabase
-            .from('projects')
-            .select('*, roles!left (project_id, auth_id, role_type)')
-            .order('createdAt', { ascending: false });
-        }
+    try {
+      setLoading(true);
+      let query;
+      
+      // Load only user's projects
+      query = await supabase
+        .from('projects')
+        .select('*, roles!inner (project_id, auth_id, role_type)')
+        .eq('roles.auth_id', user.id)
+        .order('createdAt', { ascending: false });
 
-        const { data, error } = query;
-        
-        if (error) throw error;
+      const { data, error } = query;
+      
+      if (error) throw error;
 
-        setProjects(data);
-        
-        // Set first project as current if none selected
-        if (data.length > 0 && currentProject === null){
-          setCurrentProject(data[0]);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load projects');
-      } finally {
-        setLoading(false);
+      setUserProjects(data);
+      
+      // Set first project as current if none selected
+      if (data.length > 0 && currentProject === null){
+        setCurrentProject(data[0]);
       }
-    };
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load projects');
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => {
 
-    loadProjects();
+    loadUserProjects();
+    loadAllProjects();
 
     // Subscribe to real-time changes
     const subscription = supabase
@@ -105,17 +113,17 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }, (payload) => {
         switch (payload.eventType) {
           case 'INSERT':
-            setProjects(prev => [...prev, payload.new as Project]);
+            setUserProjects(prev => [...prev, payload.new as Project]);
             break;
           case 'UPDATE':
-            setProjects(prev => prev.map(project => 
+            setUserProjects(prev => prev.map(project => 
               project.id === payload.new.id ? payload.new as Project : project
             ));
             setCurrentProject(prev => prev?.id === payload.new.id ? payload.new as Project : prev);
             break;
           case 'DELETE':
-            setProjects(prev => prev.filter(project => project.id !== payload.old.id));
-            setCurrentProject(prev => prev?.id === payload.old.id ? projects[0] || null : prev);
+            setUserProjects(prev => prev.filter(project => project.id !== payload.old.id));
+            setCurrentProject(prev => prev?.id === payload.old.id ? userProjects[0] || null : prev);
             break;
         }
       })
@@ -124,7 +132,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return () => {
       subscription.unsubscribe();
     };
-  }, [user, fetchMode]);
+  }, [user]);
 
   useEffect( () => {
     if (!user || !currentProject) return;
@@ -143,10 +151,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           if (errorRole) throw errorRole;
           
           setCurrentRole(loadRole.length > 0 ? loadRole[0].role_type : null);
-          console.log(loadRole[0].role_type);
           console.log(errorRole, "errorRole");
         } catch (err) {
           setError(err instanceof Error ? err.message : 'Failed to load role');
+          throw err;
         }
       };
       loadRole();
@@ -170,7 +178,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (error) throw error;
 
       // Set as current project if it's the first one
-      if (projects.length === 0) {
+      if (userProjects.length === 0) {
         setCurrentProject(data);
       }
     } catch (err) {
@@ -201,8 +209,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         .eq('id', id);
 
       if (error) throw error;
-      setProjects(prev => prev.filter(project => project.id !== id));
-      setCurrentProject(prev => prev?.id === id ? projects[0] || null : prev);
+      setUserProjects(prev => prev.filter(project => project.id !== id));
+      setCurrentProject(prev => prev?.id === id ? userProjects[0] || null : prev);
       // These 2 lines ensure that if the deleted project was selected, the app switches to another project.
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete project');
@@ -215,15 +223,16 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       value={{
         currentProject,
         currentRole,
-        projects,
+        userProjects,
+        allProjects,
         loading,
         error,
         createProject,
         updateProject,
         deleteProject,
         setCurrentProject,
-        fetchMode,
-        setFetchMode
+        loadUserProjects,
+        loadAllProjects,
       }}
     >
       {children}

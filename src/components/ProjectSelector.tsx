@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ChevronDown, Plus, Edit3, Trash2, AlertCircle, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '../lib/supabase';
-import { FetchMode, useProject } from '../context/ProjectContext';
+import { useProject } from '../context/ProjectContext';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -20,8 +20,7 @@ interface Project {
 }
 
 const ProjectSelector = () => {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const { currentProject, setCurrentProject, setFetchMode } = useProject();
+  const { currentProject, setCurrentProject, userProjects, loadUserProjects } = useProject();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
@@ -38,32 +37,10 @@ const ProjectSelector = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    setFetchMode(FetchMode.USER_PROJECTS);
-    fetchProjects();
-  }, []);
+    setCurrentProject(userProjects[0] || null);
+  }
+  , [userProjects]);
 
-  const fetchProjects = async () => {
-    if (!user) {
-      console.error('No authenticated user found');
-      return;
-    }
-  
-    const { data, error } = await supabase
-      .from('projects')
-      .select('*, roles!inner (project_id, auth_id, role_type)')
-      .eq('roles.auth_id', user.id)
-      .order('createdAt', { ascending: false });
-  
-    if (error) {
-      console.error('Error fetching projects:', error);
-    } else {
-      setProjects(data || []);
-      // Set first project as current if none selected
-      if (!currentProject && data && data.length > 0) {
-        setCurrentProject(data[0]);
-      }
-    }
-  };
 
   const handleProjectChange = (project: Project) => {
     setCurrentProject(project); //Updates global context
@@ -120,13 +97,13 @@ const ProjectSelector = () => {
         if (error) throw error;
 
         // Set as current project if it's the first one
-        if (projects.length === 0) {
+        if (userProjects.length === 0) {
           setCurrentProject(data);
         }
       }
 
       setIsModalOpen(false);
-      fetchProjects();
+      loadUserProjects();
     } catch (error) {
       console.error('Error saving project:', error);
       // Here you would typically show an error message to the user
@@ -145,13 +122,13 @@ const ProjectSelector = () => {
 
         // If deleted project was current, set first remaining project as current
         if (currentProject?.id === editingProject.id) {
-          const remainingProjects = projects.filter(p => p.id !== editingProject.id);
+          const remainingProjects = userProjects.filter(p => p.id !== editingProject.id);
           setCurrentProject(remainingProjects[0] || null);
         }
 
         setIsDeleteConfirmOpen(false);
         setIsModalOpen(false);
-        fetchProjects();
+        loadUserProjects();
       } catch (error) {
         console.error('Error deleting project:', error);
         // Here you would typically show an error message to the user
@@ -205,7 +182,7 @@ const ProjectSelector = () => {
               </  button>
             </div>
             <div className="border-t border-gray-200">
-              {projects.map(project => (
+              {userProjects.map(project => (
                 <div
                   key={project.id}
                   className="p-2 hover:bg-gray-50 flex items-center justify-between group"

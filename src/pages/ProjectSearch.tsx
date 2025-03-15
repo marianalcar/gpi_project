@@ -1,26 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import { Search, Calendar, ArrowRight, ChevronLeft } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
-import { FetchMode, useProject } from '../context/ProjectContext';
+import { Link, useNavigate, useNavigationType } from 'react-router-dom';
+import { useProject } from '../context/ProjectContext';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 
 function ProjectSearch() {
   const [searchTerm, setSearchTerm] = useState('');
-  const { projects, loading, error, setCurrentProject, setFetchMode } = useProject();
+  const { allProjects, loading, error, loadAllProjects, loadUserProjects } = useProject();
     const { user } = useAuth();
     const navigate = useNavigate();
+    const navigationType = useNavigationType();
 
-  const filteredProjects = projects.filter(project => {
+  const filteredProjects = allProjects.filter(project => {
     return project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           (project.description && project.description.toLowerCase().includes(searchTerm.toLowerCase()));
   });
 
   useEffect(() => {
-    setCurrentProject(null);
-    setFetchMode(FetchMode.ALL_PROJECTS);
-    console.log("Projects", projects);
-    }, []);
+    loadAllProjects();
+    }, [navigationType]);
 
     const handleJoinProject = async (project) => {
         try {
@@ -34,6 +33,7 @@ function ProjectSearch() {
         } catch (error) {
             console.error('Error joining project:', error);
         }
+        loadUserProjects();
         navigate('/');
     }
 
