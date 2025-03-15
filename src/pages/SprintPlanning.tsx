@@ -13,7 +13,8 @@ import {
   Edit3,
   ChevronDown,
   ChevronUp,
-  X
+  X,
+  ArrowUpDown  // Adicione esta importação
 } from 'lucide-react';
 import { useScrumContext, Task, Sprint } from '../context/ScrumContext';
 
@@ -39,7 +40,7 @@ const SprintPlanning = () => {
   // State for sprint creation/editing
   const [isSprintModalOpen, setIsSprintModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null);
+	const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null);
   
   // State for task selection
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
@@ -47,6 +48,8 @@ const SprintPlanning = () => {
   // State for expanded sprints
   const [expandedSprints, setExpandedSprints] = useState<string[]>([]);
   
+	const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');    
+
   // New sprint form state
   const [newSprint, setNewSprint] = useState<Partial<Sprint>>({
     name: '',
@@ -59,7 +62,25 @@ const SprintPlanning = () => {
   });
 
   // Get backlog tasks
-  const backlogTasks = getBacklogTasks();
+	const backlogTasks = getBacklogTasks();
+	
+	const sortedBacklogTasks = [...backlogTasks].sort((a, b) => {
+		const priorityValues = {
+			'High': 3,
+			'Medium': 2,
+			'Low': 1
+		};
+
+		const priorityA = priorityValues[a.priority as keyof typeof priorityValues] || 0;
+		const priorityB = priorityValues[b.priority as keyof typeof priorityValues] || 0;
+
+		return sortDirection === 'desc' ? priorityB - priorityA : priorityA - priorityB;
+	});
+
+	// Toggle sort direction
+	const toggleSortDirection = () => {
+		setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+	};
   
   // Handle adding a sprint
   const handleAddSprint = () => {
@@ -421,28 +442,37 @@ const SprintPlanning = () => {
         
         <div>
           <div className="bg-white rounded-xl shadow-sm p-6 sticky top-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-800">Backlog</h2>
-              {selectedTasks.length > 0 && (
-                <button
-                  onClick={() => setSelectedTasks([])}
-                  className="text-sm text-gray-600 hover:text-gray-800"
-                >
-                  Clear selection
-                </button>
-              )}
-            </div>
+						<div className="flex justify-between items-center mb-4">
+							<div className="flex items-center">
+								<h2 className="text-xl font-semibold text-gray-800">Backlog</h2>
+								<button
+									onClick={toggleSortDirection}
+									className="ml-2 p-1 text-gray-500 hover:text-gray-700 flex items-center"
+									title={`Sort by priority (${sortDirection === 'desc' ? 'highest first' : 'lowest first'})`}
+								>
+									<ArrowUpDown size={20} />
+								</button>
+							</div>
+							{selectedTasks.length > 0 && (
+								<button
+									onClick={() => setSelectedTasks([])}
+									className="text-sm text-gray-600 hover:text-gray-800"
+								>
+									Clear selection
+								</button>
+							)}
+						</div>
             
             {backlogTasks.length === 0 ? (
               <div className="text-center py-8 text-gray-500 border border-dashed border-gray-300 rounded-lg">
                 No tasks in backlog. Add tasks from the Product Backlog page.
               </div>
             ) : (
-              <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2">
-                {backlogTasks.map(task => (
-                  <DraggableTask key={task.id} task={task} />
-                ))}
-              </div>
+							<div className="space-y-2 max-h-[600px] overflow-y-auto pr-2">
+								{sortedBacklogTasks.map(task => (
+									<DraggableTask key={task.id} task={task} />
+								))}
+							</div>
             )}
           </div>
         </div>
