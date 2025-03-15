@@ -49,9 +49,16 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         
         // Set first project as current if none selected
         //if (data.length > 0 && !currentProject) {
-          if (data.length > 0 && currentProject === null){
-          setCurrentProject(data[0]);
-        }
+          const savedProject = localStorage.getItem('currentProject');
+          if (savedProject) {
+            const parsedProject = JSON.parse(savedProject);
+            const foundProject = data.find((p) => p.id === parsedProject.id);
+            if (foundProject) {
+              setCurrentProject(foundProject);
+            } else if (data.length > 0 && currentProject === null) {
+              setCurrentProject(data[0]);
+            }
+          }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load projects');
       } finally {

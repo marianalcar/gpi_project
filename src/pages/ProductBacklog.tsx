@@ -34,13 +34,33 @@ const ProductBacklog = () => {
   //why do we need project context here, to know when theres a project change
 
   // Get only backlog tasks (not assigned to any sprint)
-  //const backlogItems = getBacklogTasks();
-  const backlogItems = tasks;
+	const backlogItems = getBacklogTasks();
+	
+	const getSortedBacklogItems = () => {
+		const items = backlogItems;
+
+		if (sortOption === 'none') {
+			return items;
+		}
+
+		return [...items].sort((a, b) => {
+			const priorityValues = { 'High': 3, 'Medium': 2, 'Low': 1 };
+
+			if (sortOption === 'priority-high') {
+				return priorityValues[b.priority] - priorityValues[a.priority];
+			} else if (sortOption === 'priority-low') {
+				return priorityValues[a.priority] - priorityValues[b.priority];
+			}
+
+			return 0;
+		});
+	};
 
   // Modal states
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isStoryModalOpen, setIsStoryModalOpen] = useState(false);
-  const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
+	const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
+	const [sortOption, setSortOption] = useState('none'); 
   
   // Selected items for deletion
   const [selectedItems, setSelectedItems] = useState<{tasks: string[], stories: string[]}>({
@@ -274,7 +294,7 @@ const ProductBacklog = () => {
       })
     }));
 
-    const storyTasks = backlogItems.filter(task => task.storyId === story.id);
+		const storyTasks = getSortedBacklogItems().filter(task => task.storyId === story.id);
 
     return (
       <div 
@@ -339,7 +359,7 @@ const ProductBacklog = () => {
       })
     }));
 
-    const unassignedTasks = backlogItems.filter(task => !task.storyId);
+		const unassignedTasks = getSortedBacklogItems().filter(task => !task.storyId);
 
     return (
       <div 
@@ -409,7 +429,16 @@ const ProductBacklog = () => {
                 <option>High Priority</option>
                 <option>Ready for Sprint</option>
                 <option>New Items</option>
-              </select>
+							</select>
+							<select
+								value={sortOption}
+								onChange={(e) => setSortOption(e.target.value)}
+								className="px-3 py-2 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+							>
+								<option value="none">No Order</option>
+								<option value="priority-high">Priority (High → Low)</option>
+								<option value="priority-low">Priority (Low → High)</option>
+							</select>
             </div>
           </div>
         </div>
