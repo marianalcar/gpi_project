@@ -34,7 +34,7 @@ const ProductBacklog = () => {
   //why do we need project context here, to know when theres a project change
 
   // Get only backlog tasks (not assigned to any sprint)
-	const backlogItems = getBacklogTasks();
+  const backlogItems = tasks;
 	
 	const getSortedBacklogItems = () => {
 		const items = backlogItems;
