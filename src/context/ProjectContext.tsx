@@ -13,6 +13,7 @@ export interface Project {
   description: string | null;
   createdAt: string;
   createdBy: string;
+  sprintDuration: number;
   roles?: Role_data[];
 }
 
@@ -86,20 +87,28 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       
       if (error) throw error;
 
-      setUserProjects(data);
-      
-      // Set first project as current if none selected
-      if (data.length > 0 && currentProject === null){
-        setCurrentProject(data[0]);
+        setUserProjects(data);
+        
+        // Set first project as current if none selected
+        //if (data.length > 0 && !currentProject) {
+          const savedProject = localStorage.getItem('currentProject');
+          if (savedProject) {
+            const parsedProject = JSON.parse(savedProject);
+            const foundProject = data.find((p) => p.id === parsedProject.id);
+            if (foundProject) {
+              setCurrentProject(foundProject);
+            } else if (data.length > 0 && currentProject === null) {
+              setCurrentProject(data[0]);
+            }
+          }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load projects');
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load projects');
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
   useEffect(() => {
-
+    if (!user) return;
     loadUserProjects();
     loadAllProjects();
 
@@ -192,9 +201,14 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const { error } = await supabase
         .from('projects')
         .update({ name, description })
-        .eq('id', id);
+        .eq('id', id)
+        .select()
+        .single(); // Ensure we retrieve the updated project
 
       if (error) throw error;
+
+      // Refresh projects after updating
+       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update project');
       throw err;

@@ -37,14 +37,22 @@ const ProjectSelector = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    setCurrentProject(userProjects[0] || null);
-  }
-  , [userProjects]);
-
+    const savedProject = localStorage.getItem('currentProject');
+      if (savedProject) {
+        const parsedProject = JSON.parse(savedProject);
+        const foundProject = userProjects.find((p) => p.id === parsedProject.id);
+        if (foundProject) {
+          setCurrentProject(foundProject);
+        }
+      } else {
+        setCurrentProject(userProjects[0] || null);
+      }
+  }, [userProjects]);
 
   const handleProjectChange = (project: Project) => {
     setCurrentProject(project); //Updates global context
     setIsDropdownOpen(false);
+    localStorage.setItem('currentProject', JSON.stringify(project));
   };
 
   const handleOpenModal = (project: Project | null = null) => {
@@ -83,10 +91,10 @@ const ProjectSelector = () => {
 
         if (error) throw error;
 
-        // Update current project if it was the one being edited
-        /*if (currentProject?.id === editingProject.id) {
+        // Update current project if it was the one being edited <-  
+        if (currentProject?.id === editingProject.id) {
           setCurrentProject({ ...editingProject, ...formData });
-        }*/
+        }
       } else {
         const { data, error } = await supabase
           .from('projects')
