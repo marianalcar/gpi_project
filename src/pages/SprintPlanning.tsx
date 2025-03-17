@@ -13,9 +13,11 @@ import {
   Edit3,
   ChevronDown,
   ChevronUp,
-  X
+  X,
+  ArrowUpDown  // Adicione esta importação
 } from 'lucide-react';
 import { useScrumContext, Task, Sprint } from '../context/ScrumContext';
+import { useProject } from '../context/ProjectContext';
 
 // Item types for drag and drop
 const ItemTypes = {
@@ -24,6 +26,7 @@ const ItemTypes = {
 
 const SprintPlanning = () => {
   // Get data and functions from context
+  const { currentProject } = useProject();
   const { 
     tasks, 
     sprints, 
@@ -36,10 +39,13 @@ const SprintPlanning = () => {
     bulkAssignTasksToSprint
   } = useScrumContext();
 
+  // Get sprint duration from current project and defining default behaviour (default to 2 weeks if undefined)
+  const sprintDuration = currentProject?.sprintDuration || 2;
+
   // State for sprint creation/editing
   const [isSprintModalOpen, setIsSprintModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null);
+	const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null);
   
   // State for task selection
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
@@ -47,19 +53,39 @@ const SprintPlanning = () => {
   // State for expanded sprints
   const [expandedSprints, setExpandedSprints] = useState<string[]>([]);
   
+	const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');    
+
   // New sprint form state
   const [newSprint, setNewSprint] = useState<Partial<Sprint>>({
     name: '',
     description: '',
     startDate: format(new Date(), 'yyyy-MM-dd'),
-    endDate: format(addDays(new Date(), 14), 'yyyy-MM-dd'),
+    endDate: format(addDays(new Date(), sprintDuration * 7), 'yyyy-MM-dd'),
     goal: '',
     capacity: 40,
     status: 'Planned'
   });
 
   // Get backlog tasks
-  const backlogTasks = getBacklogTasks();
+	const backlogTasks = getBacklogTasks();
+	
+	const sortedBacklogTasks = [...backlogTasks].sort((a, b) => {
+		const priorityValues = {
+			'High': 3,
+			'Medium': 2,
+			'Low': 1
+		};
+
+		const priorityA = priorityValues[a.priority as keyof typeof priorityValues] || 0;
+		const priorityB = priorityValues[b.priority as keyof typeof priorityValues] || 0;
+
+		return sortDirection === 'desc' ? priorityB - priorityA : priorityA - priorityB;
+	});
+
+	// Toggle sort direction
+	const toggleSortDirection = () => {
+		setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+	};
   
   // Handle adding a sprint
   const handleAddSprint = () => {
@@ -106,6 +132,18 @@ const SprintPlanning = () => {
     setIsSprintModalOpen(false);
     setIsEditMode(false);
     setSelectedSprintId(null);
+  };
+
+  // Function to handle start date changes
+  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newStartDate = e.target.value;
+    const calculatedEndDate = format(addDays(parseISO(newStartDate), sprintDuration * 7), 'yyyy-MM-dd');
+
+    setNewSprint((prev) => ({
+      ...prev,
+      startDate: newStartDate,
+      endDate: calculatedEndDate // Automatically update end date
+    }));
   };
 
   // Handle editing a sprint
@@ -386,7 +424,7 @@ const SprintPlanning = () => {
               name: '',
               description: '',
               startDate: format(new Date(), 'yyyy-MM-dd'),
-              endDate: format(addDays(new Date(), 14), 'yyyy-MM-dd'),
+              endDate: format(addDays(new Date(), sprintDuration * 7), 'yyyy-MM-dd'),
               goal: '',
               capacity: 40,
               status: 'Planned'
@@ -421,28 +459,37 @@ const SprintPlanning = () => {
         
         <div>
           <div className="bg-white rounded-xl shadow-sm p-6 sticky top-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-800">Backlog</h2>
-              {selectedTasks.length > 0 && (
-                <button
-                  onClick={() => setSelectedTasks([])}
-                  className="text-sm text-gray-600 hover:text-gray-800"
-                >
-                  Clear selection
-                </button>
-              )}
-            </div>
+						<div className="flex justify-between items-center mb-4">
+							<div className="flex items-center">
+								<h2 className="text-xl font-semibold text-gray-800">Backlog</h2>
+								<button
+									onClick={toggleSortDirection}
+									className="ml-2 p-1 text-gray-500 hover:text-gray-700 flex items-center"
+									title={`Sort by priority (${sortDirection === 'desc' ? 'highest first' : 'lowest first'})`}
+								>
+									<ArrowUpDown size={20} />
+								</button>
+							</div>
+							{selectedTasks.length > 0 && (
+								<button
+									onClick={() => setSelectedTasks([])}
+									className="text-sm text-gray-600 hover:text-gray-800"
+								>
+									Clear selection
+								</button>
+							)}
+						</div>
             
             {backlogTasks.length === 0 ? (
               <div className="text-center py-8 text-gray-500 border border-dashed border-gray-300 rounded-lg">
                 No tasks in backlog. Add tasks from the Product Backlog page.
               </div>
             ) : (
-              <div className="space-y-2 max-h-[600px] overflow-y-auto pr-2">
-                {backlogTasks.map(task => (
-                  <DraggableTask key={task.id} task={task} />
-                ))}
-              </div>
+							<div className="space-y-2 max-h-[600px] overflow-y-auto pr-2">
+								{sortedBacklogTasks.map(task => (
+									<DraggableTask key={task.id} task={task} />
+								))}
+							</div>
             )}
           </div>
         </div>
@@ -483,7 +530,10 @@ const SprintPlanning = () => {
                     <input
                       type="date"
                       value={newSprint.startDate || ''}
-                      onChange={(e) => setNewSprint({ ...newSprint, startDate: e.target.value })}
+                      onChange={(e) => {
+                        setNewSprint({ ...newSprint, startDate: e.target.value }); // Keep existing functionality
+                        handleStartDateChange(e); // Call the function to update endDate
+                      }} 
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                     />
                   </div>

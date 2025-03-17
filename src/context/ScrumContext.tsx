@@ -119,6 +119,16 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     fetchTasks();
     fetchSprints();
     fetchStories();
+      
+    const subscription = supabase.channel('scrum_realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, fetchTasks)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'stories' }, fetchStories)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'sprints' }, fetchSprints)
+        .subscribe();
+
+    return () => {
+        supabase.removeChannel(subscription);
+    };
   }, [currentProject]); // Refetch all objects when project changes
             
             // CRUD Operations for Tasks
@@ -242,7 +252,19 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const removeTaskFromSprint = async (taskId: string) => {
-    await updateTask({ ...tasks.find(t => t.id === taskId)!, sprintId: undefined, status: 'Ready' });
+    if (!currentProject) return;
+    const { error, data } = await supabase
+    .from('tasks')
+    .update({ sprintId: null }) // Remove a associação
+    .eq('id', taskId)  // Filtra pela task correta
+    .eq('projectId', currentProject.id); // Garante que pertence ao projeto
+
+    if (error) {
+      console.error("Erro ao remover task do sprint:", error);
+    } else {
+      console.log("Task removida do sprint com sucesso:", data);
+    }
+    //await updateTask({ ...tasks.find(t => t.id === taskId)!, sprintId: undefined, status: 'Ready' });
   };
 
   const moveTaskStatus = async (taskId: string, newStatus: Task['status']) => {
