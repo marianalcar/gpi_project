@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { Plus, Filter, Search, MoreVertical, AlertCircle, Clock, CheckCircle2, Trash2, FolderOpen, X } from 'lucide-react';
 import { useScrumContext, Task, Story } from '../context/ScrumContext';
-import { useProject } from '../context/ProjectContext';
+import { useProject, Role } from '../context/ProjectContext';
 
 // Item types for drag and drop
 const ItemTypes = {
@@ -26,7 +26,7 @@ const ProductBacklog = () => {
     removeTaskFromStory,
     getBacklogTasks
   } = useScrumContext();
-  const { currentProject } = useProject(); // Get selected project
+  const { currentProject, currentRole } = useProject(); // Get selected project
   useEffect(() => {
     fetchTasks();
     fetchStories();
@@ -61,6 +61,8 @@ const ProductBacklog = () => {
     description: '',
     status: 'New'
   });
+
+  
 
   // Handle adding a task
   const handleAddTask = () => {
@@ -199,6 +201,7 @@ const ProductBacklog = () => {
     const [{ isDragging }, drag] = useDrag(() => ({
       type: ItemTypes.TASK,
       item: { id: task.id, storyId: task.storyId },
+      canDrag: currentRole === Role.Product_owner, // Only allow dragging if user is Product Owner
       collect: (monitor) => ({
         isDragging: !!monitor.isDragging()
       })
@@ -209,12 +212,15 @@ const ProductBacklog = () => {
         ref={drag}
         className={`relative border border-gray-200 rounded-lg p-3 mb-2 bg-white shadow-sm ${
           isDragging ? 'opacity-50' : 'opacity-100'
-        } ${selectedItems.tasks.includes(task.id) ? 'ring-2 ring-indigo-500' : ''}`}
+        } ${selectedItems.tasks.includes(task.id) ? 'ring-2 ring-indigo-500' : ''} ${
+          currentRole !== Role.Product_owner ? 'cursor-default' : 'cursor-grab'
+        }`}
       >
         <div className="flex justify-between items-start">
           <div className="flex-1">
             <div className="flex items-center">
               <input
+                disabled={currentRole !== Role.Product_owner}
                 type="checkbox"
                 checked={selectedItems.tasks.includes(task.id)}
                 onChange={() => toggleSelectTask(task.id)}
@@ -253,6 +259,7 @@ const ProductBacklog = () => {
         
         {inStory && (
           <button 
+            disabled={currentRole !== Role.Product_owner}
             onClick={() => handleRemoveTaskFromStory(task.id)}
             className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
           >
@@ -279,12 +286,13 @@ const ProductBacklog = () => {
       <div 
         className={`mb-6 border rounded-lg ${
           selectedItems.stories.includes(story.id) ? 'ring-2 ring-indigo-500 border-indigo-300' : 'border-gray-200'
-        } ${isOver ? 'bg-indigo-50' : 'bg-white'}`}
+        } ${isOver && currentRole === Role.Product_owner ? 'bg-indigo-50' : 'bg-white'}`}
       >
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <input
+                disabled={currentRole !== Role.Product_owner}
                 type="checkbox"
                 checked={selectedItems.stories.includes(story.id)}
                 onChange={() => toggleSelectStory(story.id)}
@@ -307,10 +315,12 @@ const ProductBacklog = () => {
           <p className="text-sm text-gray-600 mt-2">{story.description}</p>
         </div>
         
-        <div ref={drop} className="p-4">
+        <div ref={currentRole === Role.Product_owner ? drop : null} className="p-4">
           {storyTasks.length === 0 ? (
             <div className="text-center py-4 text-sm text-gray-500 border border-dashed border-gray-300 rounded-lg">
-              Drag tasks here to assign them to this story
+              {currentRole === Role.Product_owner 
+                ? "Drag tasks here to assign them to this story" 
+                : "No tasks assigned to this story"}
             </div>
           ) : (
             <div className="space-y-2">
@@ -333,6 +343,7 @@ const ProductBacklog = () => {
           handleRemoveTaskFromStory(item.id);
         }
       },
+      canDrop: () => currentRole === Role.Product_owner, // Only allow dropping if user is Product Owner
       collect: (monitor) => ({
         isOver: !!monitor.isOver()
       })
@@ -342,8 +353,8 @@ const ProductBacklog = () => {
 
     return (
       <div 
-        ref={drop} 
-        className={`mt-6 p-4 border border-gray-200 rounded-lg ${isOver ? 'bg-gray-50' : 'bg-white'}`}
+        ref={currentRole === Role.Product_owner ? drop : null} 
+        className={`mt-6 p-4 border border-gray-200 rounded-lg ${isOver && currentRole === Role.Product_owner ? 'bg-gray-50' : 'bg-white'}`}
       >
         <h2 className="text-lg font-semibold text-gray-800 mb-4">Unassigned Tasks</h2>
         {unassignedTasks.length === 0 ? (
@@ -376,6 +387,7 @@ const ProductBacklog = () => {
             </button>
           )}
           <button
+            disabled={currentRole !== Role.Product_owner}
             onClick={() => setIsAddItemModalOpen(true)}
             className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-indigo-700 transition-colors"
           >
