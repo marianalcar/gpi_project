@@ -14,23 +14,48 @@ import {
 import { format, addDays } from 'date-fns';
 import { useProject } from '../context/ProjectContext'; 
 import { useScrumContext, Task } from '../context/ScrumContext';
+import { supabase } from '../lib/supabase';
 
 // Item types for drag and drop
 const ItemTypes = {
   TASK: 'task'
 };
 
+const nrMembers = async (project_id) => {
+  let { count, error } = await supabase
+    .from('roles')
+    .select('*', { count: 'exact', head: true })
+    .eq('project_id', project_id);
+
+  if (error) {
+    console.error(error);
+    return 0;
+  }
+  return count || 0;
+};
+
 const CurrentSprint = () => {
   const { tasks, sprints, getCurrentSprint, moveTaskStatus, updateTask, fetchTasks, fetchSprints } = useScrumContext();
   const { currentProject } = useProject(); // Get selected project
+  const [membersCount, setMembersCount] = useState(0);
 
   useEffect(() => {
     fetchTasks();
     fetchSprints();
+  }, []);
+
+  useEffect(() => {
+    const fetchMembersCount = async () => {
+      if (currentProject?.id) {
+        const count = await nrMembers(currentProject.id);
+        setMembersCount(count ?? 0);
+      }
+    };
+
+    fetchMembersCount();
   }, [currentProject]); // Re-fetch when project changes
   
   // Get current sprint
-  
   const currentSprint = getCurrentSprint();
   
   // Filter tasks for current sprint
@@ -172,7 +197,7 @@ const CurrentSprint = () => {
       </div>
     );
   };
-  
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -198,7 +223,7 @@ const CurrentSprint = () => {
                 <span className="mx-2">•</span>
                 <span className="flex items-center">
                   <Users size={14} className="mr-1" />
-                  {currentSprint.capacity} members
+                  {membersCount} members
                 </span>
               </div>
             </div>
