@@ -17,7 +17,7 @@ import {
   ArrowUpDown  // Adicione esta importação
 } from 'lucide-react';
 import { useScrumContext, Task, Sprint } from '../context/ScrumContext';
-import { useProject } from '../context/ProjectContext';
+import {useProject, Role} from '../context/ProjectContext';
 
 // Item types for drag and drop
 const ItemTypes = {
@@ -68,6 +68,8 @@ const SprintPlanning = () => {
 
   // Get backlog tasks
 	const backlogTasks = getBacklogTasks();
+
+  const {currentRole} = useProject();
 	
 	const sortedBacklogTasks = [...backlogTasks].sort((a, b) => {
 		const priorityValues = {
@@ -224,12 +226,16 @@ const SprintPlanning = () => {
 
   // Draggable Task component
   const DraggableTask = ({ task }: { task: Task }) => {
+    const {currentRole} = useProject();
+    const isDeveloperRole = currentRole === Role.Developer;
+    
     const [{ isDragging }, drag] = useDrag(() => ({
       type: ItemTypes.TASK,
       item: { id: task.id },
       collect: (monitor) => ({
         isDragging: !!monitor.isDragging()
-      })
+      }),
+      canDrag: () => !isDeveloperRole // Disable dragging for developers
     }));
 
     return (
@@ -237,7 +243,9 @@ const SprintPlanning = () => {
         ref={drag}
         className={`relative border border-gray-200 rounded-lg p-3 mb-2 bg-white shadow-sm ${
           isDragging ? 'opacity-50' : 'opacity-100'
-        } ${selectedTasks.includes(task.id) ? 'ring-2 ring-indigo-500' : ''}`}
+        } ${selectedTasks.includes(task.id) ? 'ring-2 ring-indigo-500' : ''} ${
+          isDeveloperRole ? 'cursor-default' : 'cursor-grab'
+        }`}
       >
         <div className="flex justify-between items-start">
           <div className="flex-1">
@@ -247,6 +255,7 @@ const SprintPlanning = () => {
                 checked={selectedTasks.includes(task.id)}
                 onChange={() => toggleSelectTask(task.id)}
                 className="mr-2 h-4 w-4 text-indigo-600 focus:ring-indigo-500 rounded"
+                disabled={isDeveloperRole}
               />
               <h3 className="font-medium text-gray-900">{task.title}</h3>
             </div>
@@ -279,12 +288,16 @@ const SprintPlanning = () => {
 
   // Droppable Sprint component
   const DroppableSprint = ({ sprint }: { sprint: Sprint }) => {
+    const {currentRole} = useProject();
+    const isDeveloperRole = currentRole === Role.Developer;
+    
     const [{ isOver }, drop] = useDrop(() => ({
       accept: ItemTypes.TASK,
       drop: (item: { id: string }) => assignTaskToSprint(item.id, sprint.id),
       collect: (monitor) => ({
         isOver: !!monitor.isOver()
-      })
+      }),
+      canDrop: () => !isDeveloperRole // Disable dropping for developers
     }));
 
     const sprintTasks = tasks.filter(task => task.sprintId === sprint.id);
@@ -334,12 +347,14 @@ const SprintPlanning = () => {
               <button 
                 onClick={() => handleEditSprint(sprint)}
                 className="p-1 text-gray-400 hover:text-gray-600"
+                disabled={isDeveloperRole}
               >
                 <Edit3 size={18} />
               </button>
               <button 
                 onClick={() => handleDeleteSprint(sprint.id)}
                 className="p-1 text-gray-400 hover:text-red-600"
+                disabled={isDeveloperRole}
               >
                 <Trash2 size={18} />
               </button>
@@ -365,7 +380,7 @@ const SprintPlanning = () => {
         {isExpanded && (
           <div 
             ref={drop} 
-            className={`p-4 ${isOver ? 'bg-indigo-50' : 'bg-white'}`}
+            className={`p-4 ${isOver && !isDeveloperRole ? 'bg-indigo-50' : 'bg-white'}`}
           >
             <div className="flex justify-between items-center mb-3">
               <h4 className="font-medium text-gray-800">Sprint Tasks ({sprintTasks.length})</h4>
@@ -399,6 +414,7 @@ const SprintPlanning = () => {
                     <button 
                       onClick={() => removeTaskFromSprint(task.id)}
                       className="text-gray-400 hover:text-red-600"
+                      disabled={isDeveloperRole}
                     >
                       <X size={16} />
                     </button>
@@ -432,6 +448,7 @@ const SprintPlanning = () => {
             setIsSprintModalOpen(true);
           }}
           className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center hover:bg-indigo-700 transition-colors"
+          disabled={currentRole === Role.Developer}
         >
           <Plus size={18} className="mr-2" />
           Create Sprint

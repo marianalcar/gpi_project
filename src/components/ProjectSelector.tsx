@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronDown, Plus, Edit3, Trash2, AlertCircle } from 'lucide-react';
+import { ChevronDown, Plus, Edit3, Trash2, AlertCircle, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '../lib/supabase';
 import { useProject } from '../context/ProjectContext';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 
 interface Project {
@@ -18,79 +20,34 @@ interface Project {
 }
 
 const ProjectSelector = () => {
-    const { currentProject, setCurrentProject, projects, setProjects } = useProject();
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-    const [editingProject, setEditingProject] = useState<Project | null>(null);
-    const [formData, setFormData] = useState({
-        name: '',
-        description: '',
-        startDate: format(new Date(), 'yyyy-MM-dd'),
-        estimatedDuration: 12,
-        sprintDuration: 2,
-        status: 'Active' as const
-    });
+  const { currentProject, setCurrentProject, userProjects, loadUserProjects } = useProject();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    startDate: format(new Date(), 'yyyy-MM-dd'),
+    estimatedDuration: 12,
+    sprintDuration: 2,
+    status: 'Active' as const
+  });
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    fetchProjects();
     const savedProject = localStorage.getItem('currentProject');
-    if (savedProject) {
-      setCurrentProject(JSON.parse(savedProject));
-  }
-  }, []);
-    
-    useEffect(() => {
-        const projectSubscription = supabase
-            .channel('projects_realtime')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, (payload) => {
-                setProjects(prevProjects => {
-                    switch (payload.eventType) {
-                        case 'INSERT':
-                            return prevProjects.some(project => project.id === payload.new.id)
-                                ? prevProjects
-                                : [...prevProjects, payload.new as Project];
-                        case 'UPDATE':
-                            return prevProjects.map(project =>
-                                project.id === payload.new.id ? payload.new as Project : project
-                            );
-                        case 'DELETE':
-                            return prevProjects.filter(project => project.id !== payload.old.id);
-                        default:
-                            return prevProjects;
-                    }
-                });
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(projectSubscription);
-        };
-    }, []);
-
-  const fetchProjects = async () => {
-    const { data, error } = await supabase
-      .from('projects')
-      .select('*')
-      .order('createdAt', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching projects:', error);
-    } else {
-      setProjects(data || []);
-
-      const savedProject = localStorage.getItem('currentProject');
       if (savedProject) {
         const parsedProject = JSON.parse(savedProject);
-        const foundProject = data.find((p) => p.id === parsedProject.id);
+        const foundProject = userProjects.find((p) => p.id === parsedProject.id);
         if (foundProject) {
           setCurrentProject(foundProject);
         }
-      } else if (!currentProject && data && data.length > 0) { // Set first project as current if none selected
-        setCurrentProject(data[0]);
+      } else {
+        setCurrentProject(userProjects[0] || null);
       }
-    }
-  };
+  }, [userProjects]);
 
   const handleProjectChange = (project: Project) => {
     setCurrentProject(project); //Updates global context
@@ -148,13 +105,13 @@ const ProjectSelector = () => {
         if (error) throw error;
 
         // Set as current project if it's the first one
-        if (projects.length === 0) {
+        if (userProjects.length === 0) {
           setCurrentProject(data);
         }
       }
 
       setIsModalOpen(false);
-      fetchProjects();
+      loadUserProjects();
     } catch (error) {
       console.error('Error saving project:', error);
       // Here you would typically show an error message to the user
@@ -173,13 +130,13 @@ const ProjectSelector = () => {
 
         // If deleted project was current, set first remaining project as current
         if (currentProject?.id === editingProject.id) {
-          const remainingProjects = projects.filter(p => p.id !== editingProject.id);
+          const remainingProjects = userProjects.filter(p => p.id !== editingProject.id);
           setCurrentProject(remainingProjects[0] || null);
         }
 
         setIsDeleteConfirmOpen(false);
         setIsModalOpen(false);
-        fetchProjects();
+        loadUserProjects();
       } catch (error) {
         console.error('Error deleting project:', error);
         // Here you would typically show an error message to the user
@@ -216,6 +173,8 @@ const ProjectSelector = () => {
 
         {isDropdownOpen && (
           <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+            {/* Add a search for project button side by side with the Create New Project*/}
+            
             <div className="p-2">
               <button
                 onClick={() => handleOpenModal()}
@@ -224,9 +183,14 @@ const ProjectSelector = () => {
                 <Plus size={16} className="mr-2" />
                 Create New Project
               </button>
+
+              <button className="w-full flex items-center px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 rounded" onClick={() => navigate('/project-search')}>
+                <Search className="mr-2 text-gray-500" size={16} />
+                <span className="text-gray-500">Search for a project</span>
+              </  button>
             </div>
             <div className="border-t border-gray-200">
-              {projects.map(project => (
+              {userProjects.map(project => (
                 <div
                   key={project.id}
                   className="p-2 hover:bg-gray-50 flex items-center justify-between group"

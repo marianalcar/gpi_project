@@ -17,6 +17,7 @@ import SprintPlanning from './pages/SprintPlanning';
 import CurrentSprint from './pages/CurrentSprint';
 import Reports from './pages/Reports';
 import PrivateRoute from './components/PrivateRoute';
+import ProjectSearch from './pages/ProjectSearch';
 
 function App() {
   return (
@@ -35,6 +36,7 @@ function App() {
                   <Route path="current-sprint" element={<CurrentSprint />} />
                   <Route path="reports" element={<Reports />} />
                 </Route>
+                <Route path="/project-search" element={<ProjectSearch />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </DndProvider>

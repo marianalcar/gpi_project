@@ -1,3 +1,25 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Disabled button styles */
+button:disabled,
+.button:disabled,
+button[disabled],
+.button[disabled] {
+  background-color: #cccccc;
+  color: #666666;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Disabled button styles */
+input:disabled,
+.input:disabled,
+input[disabled],
+.input[disabled] {
+  background-color: #cccccc;
+  color: #666666;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
