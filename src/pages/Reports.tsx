@@ -4,6 +4,8 @@ import { BarChart3, TrendingUp, Users, Calendar, Download, Filter } from 'lucide
 import { useProject } from '../context/ProjectContext';
 import { useScrumContext, Sprint, Task } from '../context/ScrumContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from "recharts";
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 
 const Reports = () => {
@@ -201,15 +203,40 @@ const Reports = () => {
         }).sort((a, b) => b.id.localeCompare(a.id)); // Sort by sprint ID descending (assuming IDs are time-based)
     };
 
+    const exportToPDF = (chartId, chartName) => {
+        const chartElement = document.getElementById(chartId);
+        if (!chartElement) return;
+
+        html2canvas(chartElement).then(canvas => {
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('l', 'mm', 'a4'); // landscape orientation
+            const imgProps = pdf.getImageProperties(imgData);
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+            pdf.save(`${currentProject?.name || 'project'}-${chartName}.pdf`);
+        });
+    };
+
 
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <h1 className="text-2xl font-bold text-gray-800">Reports</h1>
                 <div className="flex items-center space-x-3">
-                    <button className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                    <button
+                        className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                        onClick={() => {
+                            if (activeTab === 'velocity') {
+                                exportToPDF('velocity-chart', 'velocity-chart');
+                            } else if (activeTab === 'burndown') {
+                                exportToPDF('burndown-chart', 'burndown-chart');
+                            }
+                        }}
+                    >
                         <Download size={16} />
-                        <span>Export</span>
+                        <span>Export PDF</span>
                     </button>
                 </div>
             </div>
@@ -275,16 +302,10 @@ const Reports = () => {
                                 <div>
                                     <h2 className="text-lg font-semibold text-gray-800">Sprint Velocity</h2>
                                 </div>
-                                <div className="flex items-center space-x-3">
-                                    <button className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
-                                        <Filter size={16} />
-                                        <span>Filter</span>
-                                    </button>
-                                </div>
                             </div>
 
                             {velocityData.length > 0 ? (
-                                <div className="h-80 mb-6">
+                                <div className="h-80 mb-6" id="velocity-chart">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <BarChart
                                             data={velocityData}
@@ -354,22 +375,29 @@ const Reports = () => {
                                 </div>
                                 <div className="flex items-center space-x-3">
                                     <select
-                                        className="px-3 py-2 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent min-w-[200px] w-[200px]"
+                                        className="px-3 py-2 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                                         value={selectedSprintFilter}
                                         onChange={(e) => setSelectedSprintFilter(e.target.value)}
                                     >
                                         <option value="all">All Project Tasks</option>
-                                        {sprints.map(sprint => (
-                                            <option key={sprint.id} value={sprint.id}>
-                                                {sprint.name}
-                                            </option>
-                                        ))}
+                                        {sprints
+                                            .slice() // Cria uma cópia do array para não modificar o original
+                                            .sort((a, b) => {
+                                                // Ordenação consistente por nome ou ID (resolve o problema de piscar)
+                                                return a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+                                            })
+                                            .map(sprint => (
+                                                <option key={sprint.id} value={sprint.id}>
+                                                    {sprint.name}
+                                                </option>
+                                            ))
+                                        }
                                     </select>
                                 </div>
                             </div>
 
                             {globalBurndownData.length > 0 ? (
-                                <div className="h-80 mb-6">
+                                <div className="h-80 mb-6" id="burndown-chart">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <LineChart
                                             data={globalBurndownData}
