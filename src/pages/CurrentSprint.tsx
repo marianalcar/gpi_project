@@ -5,8 +5,11 @@ import {
   Clock, 
   AlertCircle, 
   ArrowRight, 
+  Edit3, 
+  Plus, 
+  Minus,
   MoreVertical,
-  Plus,
+  X,
   Calendar,
   Users,
   Filter
@@ -36,7 +39,7 @@ const nrMembers = async (project_id) => {
 
 const CurrentSprint = () => {
   const { tasks, sprints, getCurrentSprint, moveTaskStatus, updateTask, fetchTasks, fetchSprints } = useScrumContext();
-  const { currentProject } = useProject(); // Get selected project
+  const { currentProject, projectUsers  } = useProject(); // Get selected project
   const [membersCount, setMembersCount] = useState(0);
 
   useEffect(() => {
@@ -79,6 +82,28 @@ const CurrentSprint = () => {
   const completedPoints = doneTasks.reduce((sum, task) => sum + task.storyPoints, 0);
   const pointsPercentage = totalPoints > 0 ? Math.round((completedPoints / totalPoints) * 100) : 0;
   
+  // Task detail panel state
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isDetailPanelOpen, setIsDetailPanelOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [isAssigneePanelOpen, setIsAssigneePanelOpen] = useState(false);
+
+
+  const addAssignee = (displayName: string) => {
+    setEditingTask((prev) => ({
+      ...prev!,
+      assignees: [...(prev?.assignees || []), displayName], // Append, don't overwrite
+    }));
+  };
+  
+  const removeAssignee = (displayName: string) => {
+    setEditingTask((prev) => ({
+      ...prev!,
+      assignees: prev?.assignees.filter((name) => name !== displayName) || [], //  Properly remove selected user
+    }));
+  };
+
   // Task card component with drag and drop
   const TaskCard = ({ task, index }) => {
     const [{ isDragging }, drag] = useDrag(() => ({
@@ -119,7 +144,12 @@ const CurrentSprint = () => {
     return (
       <div
         ref={drag}
-        className={`border border-gray-200 rounded-lg p-3 mb-3 bg-white shadow-sm ${
+        onClick={() => {
+          setSelectedTask(task);
+          setIsDetailPanelOpen(true);
+          setIsEditMode(false); // Always open in View Mode first, not in edit mode
+        }}
+        className={`border border-gray-200 rounded-lg p-3 mb-3 bg-white shadow-sm cursor-pointer hover:shadow-md transition ${
           isDragging ? 'opacity-50' : 'opacity-100'
         }`}
       >
@@ -143,7 +173,20 @@ const CurrentSprint = () => {
               <span className="text-xs text-gray-500 ml-2">{task.assignee}</span>
             </div>
           ) : (
-            <span className="text-xs text-gray-500">Unassigned</span>
+            <div className="flex space-x-2">
+            {Array.isArray(task.assignees) && task.assignees.length > 0 ? (
+              task.assignees.map((name, index) => (
+                <div 
+                  key={index} 
+                  className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-medium text-indigo-600"
+                >
+                  {name.split(" ").map(n => n[0]).join("").toUpperCase()} {/* Convert names to initials */}
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-gray-500">Unassigned</p> 
+            )}
+          </div>
           )}
         </div>
       </div>
@@ -283,6 +326,277 @@ const CurrentSprint = () => {
           </button>
         </div>
       )}
+
+    {isDetailPanelOpen && selectedTask && (
+      <div
+        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+        onClick={() => setIsDetailPanelOpen(false)} // Close panel when clicking outside
+       >
+        <div
+          className="fixed inset-y-0 right-0 bg-white shadow-xl w-full max-w-md flex flex-col"
+          onClick={(e) => e.stopPropagation()} // Prevents closing when clicking inside the panel
+          > 
+            {/* Header */}
+            <div className="flex justify-between items-center p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-800">
+                {isEditMode ? "Edit Task" : "Task Details"}
+              </h2>
+              <button
+                onClick={() => setIsDetailPanelOpen(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✖
+              </button>
+            </div>
+
+            {/* Task Information */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {!isEditMode ? (
+                <>
+                  {/* TASK DETAILS DISPLAY */}
+                  <h3 className="text-xl font-medium text-gray-900">{selectedTask.title}</h3>
+
+                  <div className="mt-2 flex items-center space-x-2">
+                    {/* Priority */}
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                      ${selectedTask.priority === 'High' ? 'bg-red-100 text-red-800' : 
+                        selectedTask.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' : 
+                        'bg-green-100 text-green-800'}`}
+                    >
+                      {selectedTask.priority}
+                    </span>
+
+                    {/* Story Points */}
+                    <span className="bg-indigo-100 text-indigo-800 text-xs font-medium px-2.5 py-0.5 rounded">
+                      {selectedTask.storyPoints} points
+                    </span>
+
+                    {/* Status */}
+                    <span className="bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded">
+                      {selectedTask.status}
+                    </span>
+                  </div>
+
+                  {/* Description */}
+                  <div className="mt-4">
+                    <h4 className="text-sm font-medium text-gray-700">Description</h4>
+                    <p className="mt-1 text-sm text-gray-600">{selectedTask.description || "No description provided"}</p>
+                  </div>
+
+                  {/* Assignees */}
+                  <div className="mt-4">
+                    <h4 className="text-sm font-medium text-gray-700">Assignees</h4>
+                    {selectedTask.assignees && selectedTask.assignees.length > 0 ? (
+                      <div className="mt-2 space-y-2">
+                        {selectedTask.assignees.map(assignee => (
+                          <div key={assignee} className="flex items-center p-2 bg-gray-50 rounded-lg">
+                            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-sm font-medium text-indigo-600">
+                              {assignee.split(' ').map(n => n[0]).join('')} {/* Initials */}
+                            </div>
+                            <div className="ml-3">
+                              <p className="text-sm font-medium text-gray-900">{assignee}</p>
+                              <p className="text-xs text-gray-500">Team Member</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-sm text-gray-500">No assignees</p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* EDIT TASK PANEL */}
+                  <div className="space-y-4">
+                    {/* Title */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Title</label>
+                      <input
+                        type="text"
+                        value={editingTask?.title || ""}
+                        onChange={(e) => setEditingTask({ ...editingTask!, title: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      />
+                    </div>
+
+                    {/* Description */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Description</label>
+                      <textarea
+                        value={editingTask?.description || ""}
+                        onChange={(e) => setEditingTask({ ...editingTask!, description: e.target.value })}
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      ></textarea>
+                    </div>
+
+                    {/* Priority & Story Points */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Priority</label>
+                        <select
+                          value={editingTask?.priority}
+                          onChange={(e) => setEditingTask({ ...editingTask!, priority: e.target.value as 'High' | 'Medium' | 'Low' })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                        >
+                          <option value="High">High</option>
+                          <option value="Medium">Medium</option>
+                          <option value="Low">Low</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Story Points</label>
+                        <input
+                          type="number"
+                          value={editingTask?.storyPoints || 0}
+                          onChange={(e) => setEditingTask({ ...editingTask!, storyPoints: parseInt(e.target.value) })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                          min="0"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Status */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Status</label>
+                      <select
+                        value={editingTask?.status}
+                        onChange={(e) => setEditingTask({ ...editingTask!, status: e.target.value as Task['status'] })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                      >
+                        <option value="To Do">To Do</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Review">Review</option>
+                        <option value="Done">Done</option>
+                      </select>
+                      {/* Assignees Button */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Assignees</label>
+                        <button
+                          className="w-full px-4 py-2 mt-1 bg-indigo-50 text-indigo-600 rounded-md flex items-center justify-center hover:bg-indigo-100 border border-indigo-200"
+                          onClick={() => setIsAssigneePanelOpen(true)} // Open the panel when clicked
+                        >
+                          <Users size={16} className="mr-2" 
+                          /> Edit Assignees ({editingTask?.assignees?.length || 0})
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Buttons */}
+            {isEditMode ? (
+              <div className="flex justify-between p-4 border-t border-gray-200">
+                <button
+                  onClick={() => setIsEditMode(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    updateTask(editingTask!);  // Save changes
+                    setSelectedTask(editingTask);  // Update UI
+                    setIsEditMode(false);
+                  }}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                >
+                  Save Changes
+                </button>
+              </div>
+            ) : (
+              <button
+                className="w-1/2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 mx-auto flex items-center justify-center mb-4"
+                onClick={() => {
+                  setEditingTask(selectedTask);
+                  setIsEditMode(true);
+                }}
+              >
+                 Edit Task
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+
+      {isAssigneePanelOpen && (
+  <div
+    className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+    onClick={() => setIsAssigneePanelOpen(false)} // Close when clicking outside
+  >
+    <div
+      className="fixed inset-y-0 right-0 bg-white shadow-xl w-full max-w-md flex flex-col"
+      onClick={(e) => e.stopPropagation()} // Prevent close when clicking inside
+    >
+      {/* Header */}
+      <div className="flex justify-between items-center p-4 border-b border-gray-200">
+        <h2 className="text-lg font-semibold text-gray-800">Manage Assignees</h2>
+        <button onClick={() => setIsAssigneePanelOpen(false)} className="text-gray-500 hover:text-gray-700">
+          ✖
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4">
+        {/* Users in Task */}
+        <h4 className="text-sm font-medium text-gray-700 mb-2">Users in Task ({editingTask?.assignees?.length || 0})</h4>
+        {editingTask?.assignees && editingTask.assignees.length > 0 ? (
+          editingTask.assignees.map((assignee) => (
+            <div key={assignee} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg mb-2">
+              <div className="flex items-center">
+                <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-sm font-medium text-indigo-600">
+                  {assignee.split(" ").map((n) => n[0]).join("")}
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-900">{assignee}</p>
+                  <p className="text-xs text-gray-500">Team Member</p>
+                </div>
+              </div>
+              <button
+                onClick={() => removeAssignee(assignee)}
+                className="text-red-500 hover:text-red-700"
+              >
+                ➖
+              </button>
+            </div>
+          ))
+        ) : (
+          <p className="text-sm text-gray-500">No users assigned</p>
+        )}
+
+        {/* Available Users */}
+        <h4 className="text-sm font-medium text-gray-700 mt-4 mb-2">
+          Available Users ({projectUsers.filter(user => !editingTask?.assignees?.includes(user.display_name)).length})
+          </h4>
+
+        {projectUsers
+          .filter(user => !editingTask?.assignees?.includes(user.display_name)) //  Only show unassigned users
+          .map(user => (
+            <div key={user.display_name} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg mb-2">
+              <div className="flex items-center">
+                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600">
+                  {user.display_name.split(" ").map(n => n[0]).join("")}
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-900">{user.display_name}</p>
+                  <p className="text-xs text-gray-500">{user.role}</p>
+                </div>
+              </div>
+              <button onClick={() => addAssignee(user.display_name)} className="text-indigo-500 hover:text-indigo-700">
+                ➕
+              </button>
+            </div>
+          ))} 
+      </div>
+    </div>
+  </div>
+)}
+
+
+
     </div>
   );
 };
