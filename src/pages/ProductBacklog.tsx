@@ -21,7 +21,8 @@ const ProductBacklog = () => {
     updateTask, 
     deleteTask, 
     addStory, 
-    deleteStory, 
+    deleteStory,
+    updateStory, 
     assignTaskToStory, 
     removeTaskFromStory,
     getBacklogTasks
@@ -61,6 +62,8 @@ const ProductBacklog = () => {
   const [isStoryModalOpen, setIsStoryModalOpen] = useState(false);
 	const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
 	const [sortOption, setSortOption] = useState('none'); 
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editingStory, setEditingStory] = useState<Story | null>(null);
   
   // Selected items for deletion
   const [selectedItems, setSelectedItems] = useState<{tasks: string[], stories: string[]}>({
@@ -98,7 +101,7 @@ const ProductBacklog = () => {
       status: newTask.status as 'New' | 'Ready' | 'In Sprint',
       assignee: newTask.assignee,
       storyId: newTask.storyId,
-      projectId: currentProject.id //Legit unecessary, i was desperate.
+      projectId: currentProject.id 
     });
     
     setNewTask({
@@ -251,6 +254,7 @@ const ProductBacklog = () => {
             </div>
             <p className="text-sm text-gray-500 mt-1 line-clamp-2">{task.description}</p>
           </div>
+          
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityClass(task.priority)}`}>
             {getPriorityIcon(task.priority)}
             <span className="ml-1">{task.priority}</span>
@@ -262,9 +266,22 @@ const ProductBacklog = () => {
             <span className="bg-indigo-100 text-indigo-800 text-xs font-medium px-2.5 py-0.5 rounded">
               {task.storyPoints} points
             </span>
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusClass(task.status)}`}>
-              {task.status}
-            </span>
+            <div className="flex items-center space-x-1">
+              {/* 🔵 Small Edit Button */}
+              {currentRole === Role.Product_owner && (
+                <button 
+                  onClick={() => setEditingTask(task)} 
+                  className="text-blue-600 hover:text-blue-800 text-xs font-medium"
+                >
+                  ✎ Edit
+                </button>
+              )}
+
+              {/* Task Status */}
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusClass(task.status)}`}>
+                {task.status}
+              </span>
+            </div>
           </div>
           {task.assignee ? (
             <div className="flex items-center">
@@ -324,9 +341,22 @@ const ProductBacklog = () => {
                   <FolderOpen size={18} className="text-indigo-600 mr-2" />
                   <h3 className="font-medium text-lg text-gray-900">{story.title}</h3>
                 </div>
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium mt-1 ${getStatusClass(story.status)}`}>
-                  {story.status}
-                </span>
+                <div className="flex items-center space-x-1">
+                  {/* 🔵 Small Edit Button (Only for Product Owners) */}
+                  {currentRole === Role.Product_owner && (
+                    <button 
+                      onClick={() => setEditingStory(story)} 
+                      className="text-blue-600 hover:text-blue-800 text-xs font-medium"
+                    >
+                      ✎ Edit
+                    </button>
+                  )}
+
+                  {/* Story Status */}
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusClass(story.status)}`}>
+                    {story.status}
+                  </span>
+                </div>
               </div>
             </div>
             <div className="text-sm text-gray-500">
@@ -692,6 +722,137 @@ const ProductBacklog = () => {
           </div>
         </div>
       )}
+      {/* Edit Task Panel */}
+      {editingTask && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
+            <h2 className="text-lg font-semibold text-gray-800">Edit Task</h2>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700">Title</label>
+              <input
+                type="text"
+                value={editingTask.title}
+                onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700">Description</label>
+              <textarea
+                value={editingTask.description || ""}
+                onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              ></textarea>
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700">Priority</label>
+              <select
+                value={editingTask.priority}
+                onChange={(e) => setEditingTask({ ...editingTask, priority: e.target.value as 'High' | 'Medium' | 'Low' })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
+              </select>
+            </div>
+
+            {/* Story Points Field */}
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700">Story Points</label>
+              <input
+                type="number"
+                value={editingTask.storyPoints || 0}
+                onChange={(e) => setEditingTask({ ...editingTask, storyPoints: parseInt(e.target.value) || 0 })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                min="0"
+              />
+            </div>
+
+            <div className="mt-4 flex justify-end space-x-3">
+              <button
+                onClick={() => setEditingTask(null)}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  updateTask(editingTask); // Save changes
+                  setEditingTask(null); // Close panel
+                }}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Edit Story Panel */}
+{editingStory && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
+      <h2 className="text-lg font-semibold text-gray-800">Edit Story</h2>
+
+      <div className="mt-4">
+        <label className="block text-sm font-medium text-gray-700">Title</label>
+        <input
+          type="text"
+          value={editingStory.title}
+          onChange={(e) => setEditingStory({ ...editingStory, title: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+        />
+      </div>
+
+      <div className="mt-4">
+        <label className="block text-sm font-medium text-gray-700">Description</label>
+        <textarea
+          value={editingStory.description || ""}
+          onChange={(e) => setEditingStory({ ...editingStory, description: e.target.value })}
+          rows={3}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+        ></textarea>
+      </div>
+
+      <div className="mt-4">
+        <label className="block text-sm font-medium text-gray-700">Status</label>
+        <select
+          value={editingStory.status}
+          onChange={(e) => setEditingStory({ ...editingStory, status: e.target.value as 'New' | 'Ready' | 'In Sprint' })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+        >
+          <option value="New">New</option>
+          <option value="Ready">Ready</option>
+          <option value="In Sprint">In Sprint</option>
+        </select>
+      </div>
+
+      <div className="mt-4 flex justify-end space-x-3">
+        <button
+          onClick={() => setEditingStory(null)}
+          className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => {
+            if (!editingStory) return; //  Prevents null errors
+            updateStory(editingStory); // Save changes
+            setEditingStory(null); // Close panel
+          }}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+        >
+          Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 };
