@@ -1,387 +1,582 @@
-import React, { useState } from 'react';
-import { format, subDays } from 'date-fns';
+import React, { useState, useEffect } from 'react';
+import { format, subDays, parseISO, differenceInDays } from 'date-fns';
 import { BarChart3, TrendingUp, Users, Calendar, Download, Filter } from 'lucide-react';
+import { useProject } from '../context/ProjectContext';
+import { useScrumContext, Sprint, Task } from '../context/ScrumContext';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from "recharts";
+
 
 const Reports = () => {
-  const [activeTab, setActiveTab] = useState('velocity');
-  const [dateRange, setDateRange] = useState('last30');
-  
-  // Sample data for reports
-  const velocityData = [
-    { sprint: 'Sprint 1', planned: 20, completed: 18 },
-    { sprint: 'Sprint 2', planned: 22, completed: 20 },
-    { sprint: 'Sprint 3', planned: 25, completed: 22 },
-    { sprint: 'Sprint 4', planned: 24, completed: 23 },
-    { sprint: 'Sprint 5', planned: 26, completed: 25 },
-    { sprint: 'Sprint 6', planned: 28, completed: 26 },
-    { sprint: 'Sprint 7', planned: 30, completed: 28 },
-  ];
-  
-  const burndownData = [
-    { day: 1, ideal: 40, actual: 40 },
-    { day: 2, ideal: 37, actual: 39 },
-    { day: 3, ideal: 34, actual: 38 },
-    { day: 4, ideal: 31, actual: 35 },
-    { day: 5, ideal: 28, actual: 32 },
-    { day: 6, ideal: 25, actual: 28 },
-    { day: 7, ideal: 22, actual: 25 },
-    { day: 8, ideal: 19, actual: 20 },
-    { day: 9, ideal: 16, actual: 18 },
-    { day: 10, ideal: 13, actual: 15 },
-  ];
-  
-  const teamPerformanceData = [
-    { member: 'Alex Johnson', role: 'Product Owner', completed: 12, inProgress: 3 },
-    { member: 'Emily Davis', role: 'Designer', completed: 15, inProgress: 2 },
-    { member: 'Michael Brown', role: 'Developer', completed: 18, inProgress: 4 },
-    { member: 'Sarah Williams', role: 'Developer', completed: 20, inProgress: 3 },
-    { member: 'Robert Wilson', role: 'QA Engineer', completed: 14, inProgress: 2 },
-  ];
-  
-  const sprintHistoryData = [
-    { 
-      id: 1, 
-      name: 'Sprint 6', 
-      dates: 'Feb 15 - Mar 1, 2025', 
-      goal: 'Implement core authentication features',
-      completedStories: 8,
-      totalStories: 10,
-      storyPoints: 26,
-      velocity: 24
-    },
-    { 
-      id: 2, 
-      name: 'Sprint 5', 
-      dates: 'Feb 1 - Feb 15, 2025', 
-      goal: 'Complete user dashboard and reporting',
-      completedStories: 7,
-      totalStories: 9,
-      storyPoints: 25,
-      velocity: 22
-    },
-    { 
-      id: 3, 
-      name: 'Sprint 4', 
-      dates: 'Jan 15 - Jan 31, 2025', 
-      goal: 'Implement data visualization components',
-      completedStories: 8,
-      totalStories: 8,
-      storyPoints: 23,
-      velocity: 23
-    },
-    { 
-      id: 4, 
-      name: 'Sprint 3', 
-      dates: 'Jan 1 - Jan 15, 2025', 
-      goal: 'Create responsive layouts for all pages',
-      completedStories: 6,
-      totalStories: 8,
-      storyPoints: 22,
-      velocity: 18
-    },
-  ];
+    const [activeTab, setActiveTab] = useState('velocity');
+    const { currentProject } = useProject();
+    const { tasks, sprints, fetchTasks, fetchSprints } = useScrumContext();
 
-  // Format date for display
-  const formatDateRange = () => {
-    const today = new Date();
-    let startDate;
-    
-    switch (dateRange) {
-      case 'last7':
-        startDate = subDays(today, 7);
-        break;
-      case 'last30':
-        startDate = subDays(today, 30);
-        break;
-      case 'last90':
-        startDate = subDays(today, 90);
-        break;
-      default:
-        startDate = subDays(today, 30);
-    }
-    
-    return `${format(startDate, 'MMM d, yyyy')} - ${format(today, 'MMM d, yyyy')}`;
-  };
+    // Derived data states
+    const [velocityData, setVelocityData] = useState<any[]>([]);
+    const [burndownData, setburndownData] = useState<any[]>([]);
+    const [currentSprintId, setCurrentSprintId] = useState<string>('');
+    const [globalBurndownData, setGlobalBurndownData] = useState<any[]>([]);
+    const [selectedSprintFilter, setSelectedSprintFilter] = useState<string>('all');
 
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-800">Reports</h1>
-        <div className="flex items-center space-x-3">
-          <select 
-            value={dateRange}
-            onChange={(e) => setDateRange(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-          >
-            <option value="last7">Last 7 days</option>
-            <option value="last30">Last 30 days</option>
-            <option value="last90">Last 90 days</option>
-          </select>
-          <button className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
-            <Download size={16} />
-            <span>Export</span>
-          </button>
-        </div>
-      </div>
+    // Fetch data when project changes
+    useEffect(() => {
+        if (currentProject) {
+            fetchTasks();
+            fetchSprints();
+        }
+    }, [currentProject, fetchTasks, fetchSprints]);
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="border-b border-gray-200">
-          <nav className="flex -mb-px">
-            <button
-              onClick={() => setActiveTab('velocity')}
-              className={`py-4 px-6 text-sm font-medium border-b-2 ${
-                activeTab === 'velocity'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center">
-                <TrendingUp size={18} className="mr-2" />
-                Velocity
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('burndown')}
-              className={`py-4 px-6 text-sm font-medium border-b-2 ${
-                activeTab === 'burndown'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center">
-                <BarChart3 size={18} className="mr-2" />
-                Burndown
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('team')}
-              className={`py-4 px-6 text-sm font-medium border-b-2 ${
-                activeTab === 'team'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center">
-                <Users size={18} className="mr-2" />
-                Team Performance
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('history')}
-              className={`py-4 px-6 text-sm font-medium border-b-2 ${
-                activeTab === 'history'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center">
-                <Calendar size={18} className="mr-2" />
-                Sprint History
-              </div>
-            </button>
-          </nav>
-        </div>
+    // Set current sprint when sprints change
+    useEffect(() => {
+        if (sprints.length > 0) {
+            const currentSprint = sprints.find(sprint => sprint.status === 'In Progress');
+            if (currentSprint) {
+                setCurrentSprintId(currentSprint.id);
+            } else if (sprints.length > 0) {
+                // Default to the most recent sprint if none are in progress
+                setCurrentSprintId(sprints[0].id);
+            }
+        }
+    }, [sprints]);
 
-        <div className="p-6">
-          {activeTab === 'velocity' && (
-            <div>
-              <div className="flex justify-between items-center mb-6">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-800">Sprint Velocity</h2>
-                  <p className="text-sm text-gray-500">{formatDateRange()}</p>
-                </div>
+    // Calculate velocity data when tasks or sprints change
+    useEffect(() => {
+        if (!currentProject || sprints.length === 0) return;
+
+        // Group completed tasks by sprint
+        const sprintData = sprints
+            .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+            .map(sprint => {
+                const sprintTasks = tasks.filter(task => task.sprintId === sprint.id);
+                const totalPoints = sprintTasks.reduce((sum, task) => sum + task.storyPoints, 0);
+                const completedTasks = sprintTasks.filter(task => task.status === 'Done');
+                const completedPoints = completedTasks.reduce((sum, task) => sum + task.storyPoints, 0);
+
+                return {
+                    sprint: sprint.name,
+                    planned: totalPoints,
+                    completed: completedPoints,
+                    completionRate: totalPoints > 0 ? Math.round((completedPoints / totalPoints) * 100) : 0
+                };
+            });
+
+        setVelocityData(sprintData);
+    }, [currentProject, tasks, sprints]);
+
+    // Calculate burndown data when tasks or current sprint changes
+    useEffect(() => {
+        if (!currentProject || tasks.length === 0) return;
+
+        // Get tasks based on filter (all project tasks or specific sprint)
+        let filteredTasks = tasks.filter(task => task.projectId === currentProject.id);
+
+        // Apply sprint filter if one is selected
+        if (selectedSprintFilter !== 'all') {
+            filteredTasks = filteredTasks.filter(task => task.sprintId === selectedSprintFilter);
+        }
+
+        const totalPoints = filteredTasks.reduce((sum, task) => sum + task.storyPoints, 0);
+
+        // Determine date range
+        let startDate = new Date();
+        let endDate = new Date();
+
+        if (selectedSprintFilter !== 'all' && sprints.length > 0) {
+            // If a specific sprint is selected, use its dates
+            const selectedSprint = sprints.find(s => s.id === selectedSprintFilter);
+            if (selectedSprint) {
+                startDate = parseISO(selectedSprint.startDate);
+                endDate = parseISO(selectedSprint.endDate);
+            }
+        } else if (sprints.length > 0) {
+            // For all tasks, use the full project timeline from earliest sprint to latest
+            const sprintStartDates = sprints.map(s => new Date(s.startDate));
+            const sprintEndDates = sprints.map(s => new Date(s.endDate));
+            startDate = new Date(Math.min(...sprintStartDates.map(d => d.getTime())));
+            endDate = new Date(Math.max(...sprintEndDates.map(d => d.getTime())));
+        } else {
+            // Fallback to a 30-day range if no sprints
+            startDate = subDays(new Date(), 30);
+            endDate = addDays(new Date(), 30);
+        }
+
+        // Create daily burndown data
+        const totalDays = differenceInDays(endDate, startDate) + 1;
+
+        // Ideal burndown (straight line)
+        const idealDailyBurn = totalPoints / totalDays;
+
+        // Calculate burndown points for each day
+        const burndownPoints: any[] = [];
+
+        for (let i = 0; i <= totalDays; i++) {
+            const currentDate = new Date(startDate);
+            currentDate.setDate(startDate.getDate() + i);
+
+            // Calculate ideal remaining
+            const idealRemaining = Math.max(0, totalPoints - (idealDailyBurn * i));
+
+            // For past dates, calculate actual remaining
+            let actualRemaining = totalPoints;
+
+            if (currentDate <= new Date()) {
+                const completedTasks = filteredTasks.filter(task => {
+                    return task.status === 'Done';
+                    // If you have actual completion dates:
+                    // return task.status === 'Done' && new Date(task.completedAt) <= currentDate;
+                });
+
+                const completedPoints = completedTasks.reduce((sum, task) => sum + task.storyPoints, 0);
+                actualRemaining = totalPoints - completedPoints;
+            }
+
+            burndownPoints.push({
+                day: i + 1,
+                date: format(currentDate, 'MMM d'),
+                ideal: Math.round(idealRemaining * 10) / 10,
+                actual: Math.round(actualRemaining * 10) / 10,
+                difference: Math.round((actualRemaining - idealRemaining) * 10) / 10
+            });
+        }
+
+        setGlobalBurndownData(burndownPoints);
+    }, [currentProject, tasks, sprints, selectedSprintFilter]);
+
+
+    // Get team performance data
+    const getTeamPerformanceData = () => {
+        if (!tasks.length) return [];
+
+        // Group tasks by assignee
+        const assigneeMap = new Map();
+
+        tasks.forEach(task => {
+            if (!task.assignee) return;
+
+            if (!assigneeMap.has(task.assignee)) {
+                assigneeMap.set(task.assignee, {
+                    member: task.assignee,
+                    role: 'Team Member', // Would need to fetch from user data in a real implementation
+                    completed: 0,
+                    inProgress: 0,
+                    total: 0
+                });
+            }
+
+            const userData = assigneeMap.get(task.assignee);
+
+            if (task.status === 'Done') {
+                userData.completed += 1;
+            } else if (task.status === 'In Progress') {
+                userData.inProgress += 1;
+            }
+
+            userData.total += 1;
+        });
+
+        return Array.from(assigneeMap.values());
+    };
+
+    // Get sprint history data
+    const getSprintHistoryData = () => {
+        return sprints.map(sprint => {
+            const sprintTasks = tasks.filter(task => task.sprintId === sprint.id);
+            const totalTasks = sprintTasks.length;
+            const completedTasks = sprintTasks.filter(task => task.status === 'Done').length;
+            const storyPoints = sprintTasks.reduce((sum, task) => sum + task.storyPoints, 0);
+            const completedPoints = sprintTasks
+                .filter(task => task.status === 'Done')
+                .reduce((sum, task) => sum + task.storyPoints, 0);
+
+            return {
+                id: sprint.id,
+                name: sprint.name,
+                dates: `${format(parseISO(sprint.startDate), 'MMM d')} - ${format(parseISO(sprint.endDate), 'MMM d, yyyy')}`,
+                goal: sprint.goal,
+                completedStories: completedTasks,
+                totalStories: totalTasks,
+                storyPoints: storyPoints,
+                velocity: completedPoints
+            };
+        }).sort((a, b) => b.id.localeCompare(a.id)); // Sort by sprint ID descending (assuming IDs are time-based)
+    };
+
+
+    return (
+        <div className="space-y-6">
+            <div className="flex justify-between items-center">
+                <h1 className="text-2xl font-bold text-gray-800">Reports</h1>
                 <div className="flex items-center space-x-3">
-                  <button className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
-                    <Filter size={16} />
-                    <span>Filter</span>
-                  </button>
+                    <button className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                        <Download size={16} />
+                        <span>Export</span>
+                    </button>
                 </div>
-              </div>
-              
-              <div className="h-80 flex items-center justify-center border border-dashed border-gray-300 rounded-lg mb-6">
-                <p className="text-gray-500">Velocity chart will be displayed here</p>
-              </div>
-              
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sprint</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Planned Points</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completed Points</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completion Rate</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {velocityData.map((sprint, index) => (
-                      <tr key={index}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sprint.sprint}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sprint.planned}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sprint.completed}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {Math.round((sprint.completed / sprint.planned) * 100)}%
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
             </div>
-          )}
 
-          {activeTab === 'burndown' && (
-            <div>
-              <div className="flex justify-between items-center mb-6">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-800">Sprint Burndown</h2>
-                  <p className="text-sm text-gray-500">Current Sprint (Sprint 7)</p>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <select className="px-3 py-2 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
-                    <option>Sprint 7</option>
-                    <option>Sprint 6</option>
-                    <option>Sprint 5</option>
-                  </select>
-                </div>
-              </div>
-              
-              <div className="h-80 flex items-center justify-center border border-dashed border-gray-300 rounded-lg mb-6">
-                <p className="text-gray-500">Burndown chart will be displayed here</p>
-              </div>
-              
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Day</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ideal Remaining</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actual Remaining</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Difference</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {burndownData.map((day) => (
-                      <tr key={day.day}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Day {day.day}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{day.ideal}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{day.actual}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          <span className={day.actual > day.ideal ? 'text-red-500' : 'text-green-500'}>
-                            {day.actual - day.ideal > 0 ? '+' : ''}{day.actual - day.ideal}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'team' && (
-            <div>
-              <div className="flex justify-between items-center mb-6">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-800">Team Performance</h2>
-                  <p className="text-sm text-gray-500">{formatDateRange()}</p>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <button className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
-                    <Filter size={16} />
-                    <span>Filter</span>
-                  </button>
-                </div>
-              </div>
-              
-              <div className="h-80 flex items-center justify-center border border-dashed border-gray-300 rounded-lg mb-6">
-                <p className="text-gray-500">Team performance chart will be displayed here</p>
-              </div>
-              
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Team Member</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completed Tasks</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">In Progress</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completion Rate</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {teamPerformanceData.map((member, index) => (
-                      <tr key={index}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-medium text-indigo-600 mr-3">
-                              {member.member.split(' ').map(n => n[0]).join('')}
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="border-b border-gray-200">
+                    <nav className="flex -mb-px">
+                        <button
+                            onClick={() => setActiveTab('velocity')}
+                            className={`py-4 px-6 text-sm font-medium border-b-2 ${activeTab === 'velocity'
+                                    ? 'border-indigo-500 text-indigo-600'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                        >
+                            <div className="flex items-center">
+                                <TrendingUp size={18} className="mr-2" />
+                                Velocity
                             </div>
-                            <span className="text-sm font-medium text-gray-900">{member.member}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.role}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.completed}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.inProgress}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {Math.round((member.completed / (member.completed + member.inProgress)) * 100)}%
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('burndown')}
+                            className={`py-4 px-6 text-sm font-medium border-b-2 ${activeTab === 'burndown'
+                                    ? 'border-indigo-500 text-indigo-600'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                        >
+                            <div className="flex items-center">
+                                <BarChart3 size={18} className="mr-2" />
+                                Burndown
+                            </div>
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('team')}
+                            className={`py-4 px-6 text-sm font-medium border-b-2 ${activeTab === 'team'
+                                    ? 'border-indigo-500 text-indigo-600'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                        >
+                            <div className="flex items-center">
+                                <Users size={18} className="mr-2" />
+                                Team Performance
+                            </div>
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('history')}
+                            className={`py-4 px-6 text-sm font-medium border-b-2 ${activeTab === 'history'
+                                    ? 'border-indigo-500 text-indigo-600'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
+                        >
+                            <div className="flex items-center">
+                                <Calendar size={18} className="mr-2" />
+                                Sprint History
+                            </div>
+                        </button>
+                    </nav>
+                </div>
 
-          {activeTab === 'history' && (
-            <div>
-              <div className="flex justify-between items-center mb-6">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-800">Sprint History</h2>
-                  <p className="text-sm text-gray-500">{formatDateRange()}</p>
+                <div className="p-6">
+                    {activeTab === 'velocity' && (
+                        <div>
+                            <div className="flex justify-between items-center mb-6">
+                                <div>
+                                    <h2 className="text-lg font-semibold text-gray-800">Sprint Velocity</h2>
+                                </div>
+                                <div className="flex items-center space-x-3">
+                                    <button className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                                        <Filter size={16} />
+                                        <span>Filter</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {velocityData.length > 0 ? (
+                                <div className="h-80 mb-6">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart
+                                            data={velocityData}
+                                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                                        >
+                                            <CartesianGrid strokeDasharray="3 3" />
+                                            <XAxis dataKey="sprint" />
+                                            <YAxis />
+                                            <Tooltip />
+                                            <Legend />
+                                            <Bar dataKey="planned" name="Planned Points" fill="#8884d8" />
+                                            <Bar dataKey="completed" name="Completed Points" fill="#82ca9d" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            ) : (
+                                <div className="h-80 flex items-center justify-center border border-dashed border-gray-300 rounded-lg mb-6">
+                                    <p className="text-gray-500">No velocity data available. Complete some sprints to see your team's velocity.</p>
+                                </div>
+                            )}
+
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sprint</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Planned Points</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completed Points</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completion Rate</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {velocityData.length > 0 ? velocityData.map((sprint, index) => (
+                                            <tr key={index}>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sprint.sprint}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sprint.planned}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sprint.completed}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    {sprint.completionRate}%
+                                                </td>
+                                            </tr>
+                                        )) : (
+                                            <tr>
+                                                <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">
+                                                    No sprint data available
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'burndown' && (
+                        <div>
+                            <div className="flex justify-between items-center mb-6">
+                                <div>
+                                    <h2 className="text-lg font-semibold text-gray-800">
+                                        {selectedSprintFilter === 'all' ? 'Project Burndown' : 'Sprint Burndown'}
+                                    </h2>
+                                    <p className="text-sm text-gray-500">
+                                        {selectedSprintFilter === 'all'
+                                            ? (currentProject ? currentProject.name : 'No project selected')
+                                            : (sprints.find(s => s.id === selectedSprintFilter)?.name || 'No sprint selected')}
+                                    </p>
+                                </div>
+                                <div className="flex items-center space-x-3">
+                                    <select
+                                        className="px-3 py-2 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent min-w-[200px] w-[200px]"
+                                        value={selectedSprintFilter}
+                                        onChange={(e) => setSelectedSprintFilter(e.target.value)}
+                                    >
+                                        <option value="all">All Project Tasks</option>
+                                        {sprints.map(sprint => (
+                                            <option key={sprint.id} value={sprint.id}>
+                                                {sprint.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {globalBurndownData.length > 0 ? (
+                                <div className="h-80 mb-6">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart
+                                            data={globalBurndownData}
+                                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                                        >
+                                            <CartesianGrid strokeDasharray="3 3" />
+                                            <XAxis dataKey="date" />
+                                            <YAxis />
+                                            <Tooltip />
+                                            <Legend />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="ideal"
+                                                name="Ideal Burndown"
+                                                stroke="#8884d8"
+                                                activeDot={{ r: 8 }}
+                                            />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="actual"
+                                                name="Actual Remaining"
+                                                stroke="#82ca9d"
+                                            />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            ) : (
+                                <div className="h-80 flex items-center justify-center border border-dashed border-gray-300 rounded-lg mb-6">
+                                    <p className="text-gray-500">
+                                        {selectedSprintFilter === 'all'
+                                            ? 'No burndown data available. Add tasks to see the project burndown chart.'
+                                            : 'No burndown data available for this sprint. Add tasks to see the sprint burndown chart.'}
+                                    </p>
+                                </div>
+                            )}
+
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Day</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ideal Remaining</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actual Remaining</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Difference</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {globalBurndownData.length > 0 ? globalBurndownData.map((day) => (
+                                            <tr key={day.day}>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Day {day.day}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{day.date}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{day.ideal}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{day.actual}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    <span className={day.difference > 0 ? 'text-red-500' : 'text-green-500'}>
+                                                        {day.difference > 0 ? '+' : ''}{day.difference}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        )) : (
+                                            <tr>
+                                                <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                                                    No burndown data available
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'team' && (
+                        <div>
+                            <div className="flex justify-between items-center mb-6">
+                                <div>
+                                    <h2 className="text-lg font-semibold text-gray-800">Team Performance</h2>
+                                </div>
+                                <div className="flex items-center space-x-3">
+                                    <button className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                                        <Filter size={16} />
+                                        <span>Filter</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {getTeamPerformanceData().length > 0 ? (
+                                <div className="h-80 mb-6">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart
+                                            data={getTeamPerformanceData()}
+                                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                                            layout="vertical"
+                                        >
+                                            <CartesianGrid strokeDasharray="3 3" />
+                                            <XAxis type="number" />
+                                            <YAxis dataKey="member" type="category" width={150} />
+                                            <Tooltip />
+                                            <Legend />
+                                            <Bar dataKey="completed" name="Completed Tasks" stackId="a" fill="#82ca9d" />
+                                            <Bar dataKey="inProgress" name="In Progress" stackId="a" fill="#8884d8" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            ) : (
+                                <div className="h-80 flex items-center justify-center border border-dashed border-gray-300 rounded-lg mb-6">
+                                    <p className="text-gray-500">No team performance data available. Assign tasks to team members to see performance metrics.</p>
+                                </div>
+                            )}
+
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Team Member</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completed Tasks</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">In Progress</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completion Rate</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {getTeamPerformanceData().length > 0 ? getTeamPerformanceData().map((member, index) => (
+                                            <tr key={index}>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="flex items-center">
+                                                        <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-medium text-indigo-600 mr-3">
+                                                            {member.member.split(' ').map((n: string) => n[0]).join('')}
+                                                        </div>
+                                                        <span className="text-sm font-medium text-gray-900">{member.member}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.role}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.completed}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.inProgress}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    {Math.round((member.completed / (member.completed + member.inProgress)) * 100) || 0}%
+                                                </td>
+                                            </tr>
+                                        )) : (
+                                            <tr>
+                                                <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                                                    No team performance data available
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'history' && (
+                        <div>
+                            <div className="flex justify-between items-center mb-6">
+                                <div>
+                                    <h2 className="text-lg font-semibold text-gray-800">Sprint History</h2>
+                                </div>
+                                <div className="flex items-center space-x-3">
+                                    <button className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                                        <Filter size={16} />
+                                        <span>Filter</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sprint</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dates</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Goal</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completed</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Story Points</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Velocity</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {getSprintHistoryData().length > 0 ? getSprintHistoryData().map((sprint) => (
+                                            <tr key={sprint.id}>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sprint.name}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sprint.dates}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sprint.goal}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                    {sprint.completedStories}/{sprint.totalStories} stories ({Math.round((sprint.completedStories / sprint.totalStories) * 100) || 0}%)
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sprint.storyPoints}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sprint.velocity}</td>
+                                            </tr>
+                                        )) : (
+                                            <tr>
+                                                <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
+                                                    No sprint history available
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
                 </div>
-                <div className="flex items-center space-x-3">
-                  <button className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
-                    <Filter size={16} />
-                    <span>Filter</span>
-                  </button>
-                </div>
-              </div>
-              
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sprint</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dates</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Goal</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completed</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Story Points</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Velocity</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {sprintHistoryData.map((sprint) => (
-                      <tr key={sprint.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{sprint.name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sprint.dates}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sprint.goal}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {sprint.completedStories}/{sprint.totalStories} stories ({Math.round((sprint.completedStories / sprint.totalStories) * 100)}%)
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sprint.storyPoints}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sprint.velocity}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
             </div>
-          )}
         </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default Reports;
