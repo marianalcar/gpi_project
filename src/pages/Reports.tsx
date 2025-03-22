@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { format, subDays, parseISO, differenceInDays } from 'date-fns';
+import { format, subDays, parseISO, differenceInDays, addDays } from 'date-fns';
 import { BarChart3, TrendingUp, Users, Calendar, Download, Filter } from 'lucide-react';
 import { useProject } from '../context/ProjectContext';
 import { useScrumContext, Sprint, Task } from '../context/ScrumContext';
@@ -109,32 +109,41 @@ const Reports = () => {
         const idealDailyBurn = totalPoints / totalDays;
 
         // Calculate burndown points for each day
-        const burndownPoints: any[] = [];
+        const burndownPoints = [];
 
         for (let i = 0; i <= totalDays; i++) {
-            const currentDate = new Date(startDate);
-            currentDate.setDate(startDate.getDate() + i);
+            const currentDate = addDays(new Date(startDate), i);
+            const formattedDate = format(currentDate, 'MMM d');
 
             // Calculate ideal remaining
             const idealRemaining = Math.max(0, totalPoints - (idealDailyBurn * i));
 
-            // For past dates, calculate actual remaining
+            // For all dates, calculate actual remaining based on completedAt
             let actualRemaining = totalPoints;
 
-            if (currentDate <= new Date()) {
-                const completedTasks = filteredTasks.filter(task => {
-                    //return task.status === 'Done';
-                    // If you have actual completion dates:
-                    return task.status === 'Done' && task.completedAt && new Date(task.completedAt) <= currentDate;
-                });
+            // Filter tasks that were completed on or before the current date
+            const completedTasks = filteredTasks.filter(task => {
+                if (task.status !== 'Done' || !task.completedAt) {
+                    return false;
+                }
 
-                const completedPoints = completedTasks.reduce((sum, task) => sum + task.storyPoints, 0);
-                actualRemaining = totalPoints - completedPoints;
+                // Parse completedAt date and compare with currentDate
+                const completionDate = parseISO(task.completedAt);
+                return completionDate <= currentDate;
+            });
+
+            const completedPoints = completedTasks.reduce((sum, task) => sum + task.storyPoints, 0);
+            actualRemaining = totalPoints - completedPoints;
+
+            // For future dates, use the last known actual value
+            if (currentDate > new Date()) {
+                // Keep the last known actual value from today
+                // This will create a flat line from today to the end date
             }
 
             burndownPoints.push({
                 day: i + 1,
-                date: format(currentDate, 'MMM d'),
+                date: formattedDate,
                 ideal: Math.round(idealRemaining * 10) / 10,
                 actual: Math.round(actualRemaining * 10) / 10,
                 difference: Math.round((actualRemaining - idealRemaining) * 10) / 10
@@ -143,7 +152,6 @@ const Reports = () => {
 
         setGlobalBurndownData(burndownPoints);
     }, [currentProject, tasks, sprints, selectedSprintFilter]);
-
 
     // Get team performance data
     const getTeamPerformanceData = () => {
