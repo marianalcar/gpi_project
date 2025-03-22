@@ -47,7 +47,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (!currentSprint || sprintTasks.length === 0) return;
-
+    
     const totalPoints = sprintTasks.reduce((sum, task) => sum + task.storyPoints, 0);
     const startDate = parseISO(currentSprint.startDate);
     const endDate = parseISO(currentSprint.endDate);
@@ -64,18 +64,13 @@ const Dashboard = () => {
 
       let actualRemaining = totalPoints;
 
-      if (currentDate <= new Date()) {
-        const completedTasks = sprintTasks.filter(task => {
-          return task.status === 'Done' && task.completedAt && new Date(task.completedAt) <= currentDate;
-        });
+      // Calculate actual remaining points up to the current date
+      const completedTasks = sprintTasks.filter(task => {
+        return task.status === 'Done' && task.completedAt && new Date(task.completedAt) <= currentDate;
+      });
 
-        const completedPoints = completedTasks.reduce((sum, task) => sum + task.storyPoints, 0);
-        actualRemaining = totalPoints - completedPoints;
-      } else {
-        if (burndownPoints.length > 0) {
-          actualRemaining = burndownPoints[burndownPoints.length - 1].actual;
-        }
-      }
+      const completedPoints = completedTasks.reduce((sum, task) => sum + task.storyPoints, 0);
+      actualRemaining = totalPoints - completedPoints;
 
       burndownPoints.push({
         day: i + 1,
@@ -134,10 +129,6 @@ const Dashboard = () => {
         <div className="bg-white rounded-xl shadow-sm p-6 col-span-2">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-lg font-semibold text-gray-800">Sprint Burndown</h2>
-            <select className="text-sm border rounded-md px-2 py-1">
-              <option>Current Sprint</option>
-              <option>Previous Sprint</option>
-            </select>
           </div>
           {burndownData.length > 0 ? (
             <div className="h-64">
