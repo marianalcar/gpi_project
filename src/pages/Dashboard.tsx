@@ -1,5 +1,5 @@
-import React from 'react';
-import { format } from 'date-fns';
+import React, { useState, useEffect } from 'react';
+import { format, parseISO, differenceInDays, subDays, addDays } from 'date-fns';
 import { 
   Calendar, 
   CheckCircle2, 
@@ -9,6 +9,7 @@ import {
   TrendingUp 
 } from 'lucide-react';
 import { useScrumContext } from '../context/ScrumContext';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const Dashboard = () => {
   const { tasks, sprints, getCurrentSprint } = useScrumContext();
@@ -40,6 +41,53 @@ const Dashboard = () => {
         return sum + sprintCompletedTasks.reduce((points, task) => points + task.storyPoints, 0);
       }, 0) / completedSprints.length)
     : 0;
+
+  // Burndown chart logic
+  const [burndownData, setBurndownData] = useState([]);
+
+  useEffect(() => {
+    if (!currentSprint || sprintTasks.length === 0) return;
+
+    const totalPoints = sprintTasks.reduce((sum, task) => sum + task.storyPoints, 0);
+    const startDate = parseISO(currentSprint.startDate);
+    const endDate = parseISO(currentSprint.endDate);
+    const totalDays = differenceInDays(endDate, startDate) + 1;
+    const idealDailyBurn = totalPoints / totalDays;
+
+    const burndownPoints = [];
+
+    for (let i = 0; i <= totalDays; i++) {
+      const currentDate = new Date(startDate);
+      currentDate.setDate(startDate.getDate() + i);
+
+      const idealRemaining = Math.max(0, totalPoints - (idealDailyBurn * i));
+
+      let actualRemaining = totalPoints;
+
+      if (currentDate <= new Date()) {
+        const completedTasks = sprintTasks.filter(task => {
+          return task.status === 'Done' && task.completedAt && new Date(task.completedAt) <= currentDate;
+        });
+
+        const completedPoints = completedTasks.reduce((sum, task) => sum + task.storyPoints, 0);
+        actualRemaining = totalPoints - completedPoints;
+      } else {
+        if (burndownPoints.length > 0) {
+          actualRemaining = burndownPoints[burndownPoints.length - 1].actual;
+        }
+      }
+
+      burndownPoints.push({
+        day: i + 1,
+        date: format(currentDate, 'MMM d'),
+        ideal: Math.round(idealRemaining * 10) / 10,
+        actual: Math.round(actualRemaining * 10) / 10,
+        difference: Math.round((actualRemaining - idealRemaining) * 10) / 10,
+      });
+    }
+
+    setBurndownData(burndownPoints);
+  }, [currentSprint, sprintTasks]);
   
   return (
     <div className="space-y-6">
@@ -91,9 +139,36 @@ const Dashboard = () => {
               <option>Previous Sprint</option>
             </select>
           </div>
-          <div className="h-64 flex items-center justify-center border border-dashed border-gray-300 rounded-lg">
-            <p className="text-gray-500">Sprint burndown chart will be displayed here</p>
-          </div>
+          {burndownData.length > 0 ? (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={burndownData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="ideal"
+                    name="Ideal Burndown"
+                    stroke="#8884d8"
+                    strokeDasharray="5 5"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="actual"
+                    name="Actual Remaining"
+                    stroke="#82ca9d"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center border border-dashed border-gray-300 rounded-lg">
+              <p className="text-gray-500">No burndown data available</p>
+            </div>
+          )}
         </div>
         
         <div className="bg-white rounded-xl shadow-sm p-6">
