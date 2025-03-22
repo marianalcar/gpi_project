@@ -123,9 +123,9 @@ const Reports = () => {
 
             if (currentDate <= new Date()) {
                 const completedTasks = filteredTasks.filter(task => {
-                    return task.status === 'Done';
+                    //return task.status === 'Done';
                     // If you have actual completion dates:
-                    // return task.status === 'Done' && new Date(task.completedAt) <= currentDate;
+                    return task.status === 'Done' && task.completedAt && new Date(task.completedAt) <= currentDate;
                 });
 
                 const completedPoints = completedTasks.reduce((sum, task) => sum + task.storyPoints, 0);
