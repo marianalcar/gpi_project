@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronDown, Plus, Edit3, Trash2, AlertCircle, Search } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ChevronUp, Plus, Edit3, Trash2, AlertCircle, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '../lib/supabase';
 import { useProject } from '../context/ProjectContext';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-
 
 interface Project {
   id: string;
@@ -21,7 +20,7 @@ interface Project {
 
 const ProjectSelector = () => {
   const { currentProject, setCurrentProject, userProjects, loadUserProjects } = useProject();
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isSlideUpOpen, setIsSlideUpOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -35,23 +34,24 @@ const ProjectSelector = () => {
   });
   const { user } = useAuth();
   const navigate = useNavigate();
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const savedProject = localStorage.getItem('currentProject');
-      if (savedProject) {
-        const parsedProject = JSON.parse(savedProject);
-        const foundProject = userProjects.find((p) => p.id === parsedProject.id);
-        if (foundProject) {
-          setCurrentProject(foundProject);
-        }
-      } else {
-        setCurrentProject(userProjects[0] || null);
+    if (savedProject) {
+      const parsedProject = JSON.parse(savedProject);
+      const foundProject = userProjects.find((p) => p.id === parsedProject.id);
+      if (foundProject) {
+        setCurrentProject(foundProject);
       }
+    } else {
+      setCurrentProject(userProjects[0] || null);
+    }
   }, [userProjects]);
 
   const handleProjectChange = (project: Project) => {
-    setCurrentProject(project); //Updates global context
-    setIsDropdownOpen(false);
+    setCurrentProject(project); // Updates global context
+    setIsSlideUpOpen(false);
     localStorage.setItem('currentProject', JSON.stringify(project));
   };
 
@@ -78,7 +78,7 @@ const ProjectSelector = () => {
       });
     }
     setIsModalOpen(true);
-    setIsDropdownOpen(false);
+    setIsSlideUpOpen(false);
   };
 
   const handleSubmit = async () => {
@@ -161,75 +161,99 @@ const ProjectSelector = () => {
     <>
       <div className="relative">
         <button
-          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-          className="flex items-center space-x-2 px-4 py-2 bg-white rounded-lg border border-gray-200 hover:bg-gray-50"
+          ref={buttonRef}
+          onClick={() => setIsSlideUpOpen(!isSlideUpOpen)}
+          className="flex items-center space-x-2 px-4 py-2 bg-indigo-500 rounded-lg border border-indigo-400 hover:bg-indigo-300"
         >
           <div className="flex flex-col items-start">
-            <span className="text-xs text-gray-500">Current Project</span>
-            <span className="font-medium">{currentProject?.name || 'Select Project'}</span>
+            <span className="text-xs text-gray-950">Current Project</span>
+            <span className="font-medium text-white">{currentProject?.name || 'Select Project'}</span>
           </div>
-          <ChevronDown size={16} className="text-gray-500" />
+          <ChevronUp size={16} className="text-black" />
         </button>
 
-        {isDropdownOpen && (
-          <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-            {/* Add a search for project button side by side with the Create New Project*/}
-            
-            <div className="p-2">
-              <button
-                onClick={() => handleOpenModal()}
-                className="w-full flex items-center px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 rounded"
-              >
-                <Plus size={16} className="mr-2" />
-                Create New Project
-              </button>
+        {/* Slide-up Panel with Animation */}
+        <div 
+          className={`absolute z-50 w-21 bg-white rounded-lg shadow-black shadow-2xl border border-indigo-200 transition-all duration-200 ease-in-out ${isSlideUpOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
+          style={{ 
+            bottom: buttonRef.current ? buttonRef.current.offsetHeight + 10 : '3rem', 
+            left: 0,
+            transformOrigin: 'bottom' 
+          }}
+        >
+          <div className="p-2">
+            <button
+              onClick={() => handleOpenModal()}
+              className="w-full flex items-center px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 rounded"
+            >
+              <Plus size={16} className="mr-2" />
+              Create New Project
+            </button>
 
-              <button className="w-full flex items-center px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 rounded" onClick={() => navigate('/project-search')}>
-                <Search className="mr-2 text-gray-500" size={16} />
-                <span className="text-gray-500">Search for a project</span>
-              </  button>
-            </div>
-            <div className="border-t border-gray-200">
-              {userProjects.map(project => (
-                <div
-                  key={project.id}
-                  className="p-2 hover:bg-gray-50 flex items-center justify-between group"
-                >
-                  <button
-                    onClick={() => {
-                      handleProjectChange(project)
-                    }}
-                    className="flex-1 flex items-center text-left px-2"
-                  >
-                    <div>
-                      <div className="font-medium text-gray-900">{project.name}</div>
-                      <div className="text-sm text-gray-500 truncate max-w-[180px]">
-                        {project.description}
-                      </div>
-                      <div className="mt-1">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getProjectStatusColor(project.status)}`}>
-                          {project.status}
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                  <div className="opacity-0 group-hover:opacity-100 flex items-center px-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenModal(project);
-                      }}
-                      className="p-1 text-gray-400 hover:text-gray-600"
-                    >
-                      <Edit3 size={16} />
-                    </button>
-                  </div>
+            <button 
+              className="w-full flex items-center px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 rounded" 
+              onClick={() => {
+          navigate('/project-search');
+          setIsSlideUpOpen(false);
+              }}
+            >
+              <Search className="mr-2 text-gray-500" size={16} />
+              <span className="text-gray-500">Search for a project</span>
+            </button>
+          </div>
+          
+          <div className="border-t border-gray-200 max-h-64 overflow-y-auto">
+            {userProjects.length > 0 ? (
+              userProjects.map(project => (
+          <div
+            key={project.id}
+            className="p-2 hover:bg-gray-50 flex items-center justify-between group"
+          >
+            <button
+              onClick={() => handleProjectChange(project)}
+              className="flex-1 flex items-center text-left px-2"
+            >
+              <div>
+                <div className="font-medium text-gray-900">{project.name}</div>
+                <div className="text-sm text-gray-500 truncate max-w-[180px]">
+            {project.description}
                 </div>
-              ))}
+                <div className="mt-1">
+            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getProjectStatusColor(project.status)}`}>
+              {project.status}
+            </span>
+                </div>
+              </div>
+            </button>
+            <div className="opacity-0 group-hover:opacity-100 flex items-center px-2">
+              <button
+                onClick={(e) => {
+            e.stopPropagation();
+            handleOpenModal(project);
+                }}
+                className="p-1 text-gray-400 hover:text-gray-600"
+              >
+                <Edit3 size={16} />
+              </button>
             </div>
           </div>
-        )}
+              ))
+            ) : (
+              <div className="px-4 py-6 text-center text-gray-500 text-sm">
+          No projects found
+              </div>
+            )}
+          </div>
+        </div>
       </div>
+
+      {/* Background Overlay - Only visible when slide-up is open */}
+      {isSlideUpOpen && (
+        <div 
+          className="fixed inset-0 z-40" 
+          onClick={() => setIsSlideUpOpen(false)}
+        />
+      )}
 
       {/* Create/Edit Project Modal */}
       {isModalOpen && (
