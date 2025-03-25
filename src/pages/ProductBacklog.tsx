@@ -99,7 +99,6 @@ const ProductBacklog = () => {
       priority: newTask.priority as 'High' | 'Medium' | 'Low',
       storyPoints: newTask.storyPoints || 0,
       status: newTask.status as 'New' | 'Ready' | 'In Sprint',
-      assignee: newTask.assignee,
       storyId: newTask.storyId,
       projectId: currentProject.id 
     });
@@ -283,6 +282,7 @@ const ProductBacklog = () => {
               </span>
             </div>
           </div>
+          {/*  This is the assignee field on task card
           {task.assignee ? (
             <div className="flex items-center">
               <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-medium text-indigo-600">
@@ -293,6 +293,7 @@ const ProductBacklog = () => {
           ) : (
             <span className="text-xs text-gray-500">Unassigned</span>
           )}
+            */}
         </div>
         
         {inStory && (
@@ -620,6 +621,7 @@ const ProductBacklog = () => {
                       <option value="In Sprint">In Sprint</option>
                     </select>
                   </div>
+                  {/*
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Assignee (Optional)</label>
                     <input
@@ -630,6 +632,7 @@ const ProductBacklog = () => {
                       placeholder="Enter name"
                     />
                   </div>
+                  */}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Assign to Story (Optional)</label>
