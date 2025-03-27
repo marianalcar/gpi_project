@@ -1,7 +1,26 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Plus, X, ZoomIn, ZoomOut, RotateCcw, MessageSquare, ThumbsUp, ThumbsDown, ChevronRight, ChevronLeft } from 'lucide-react';
-import { Chat, MessageRow, useMyId, useNicknames, useStateTogether } from 'react-together';
-import { useAuth } from '../context/AuthContext';
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import {
+  Plus,
+  X,
+  MessageSquare,
+  ThumbsUp,
+  ThumbsDown,
+  ChevronRight,
+  ArrowLeft,
+} from "lucide-react";
+import {
+  Chat,
+  MessageRow,
+  useMyId,
+  useNicknames,
+  useStateTogether,
+  useJoinUrl,
+  useLeaveSession,
+  MessageList,
+  useConnectedUsers,
+} from "react-together";
+import { useAuth } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 interface Comment {
   id: string;
@@ -35,24 +54,23 @@ interface NoteProps {
   hasLiked: boolean;
   hasDisliked: boolean;
   onDelete: (categoryId: string, noteId: string) => void;
-  onReaction: (categoryId: string, noteId: string, type: 'like' | 'dislike') => void;
+  onReaction: (
+    categoryId: string,
+    noteId: string,
+    type: "like" | "dislike"
+  ) => void;  
   onComment: (categoryId: string, noteId: string) => void;
 }
 
-interface NotesContainerProps {
-  categoryId: string;
-  children: React.ReactNode;
-}
-
-const NoteItem: React.FC<NoteProps> = ({ 
-  note, 
-  categoryId, 
+const NoteItem: React.FC<NoteProps> = ({
+  note,
+  categoryId,
   color,
   hasLiked,
-  hasDisliked, 
-  onDelete, 
-  onReaction, 
-  onComment 
+  hasDisliked,
+  onDelete,
+  onReaction,
+  onComment,
 }) => {
   return (
     <div className={`${color} p-4 rounded shadow-sm relative group`}>
@@ -65,24 +83,32 @@ const NoteItem: React.FC<NoteProps> = ({
       <p className="text-gray-800 text-sm break-words mb-3">{note.text}</p>
       <div className="flex items-center gap-3 text-sm text-gray-600">
         <button
-          onClick={() => onReaction(categoryId, note.id, 'like')}
-          className={`flex items-center gap-1 ${hasLiked ? 'text-green-500' : ''}`}
+          onClick={() => onReaction(categoryId, note.id, "like")}
+          className={`flex items-center gap-1 ${
+            hasLiked ? "text-green-500" : ""
+          }`}
           title={
-            hasLiked ? "You already liked this" :
-            hasDisliked ? "You already disliked this" : 
-            "Like this note"
+            hasLiked
+              ? "You already liked this"
+              : hasDisliked
+              ? "You already disliked this"
+              : "Like this note"
           }
         >
           <ThumbsUp size={14} />
           {note.likes}
         </button>
         <button
-          onClick={() => onReaction(categoryId, note.id, 'dislike')}
-          className={`flex items-center gap-1 ${hasDisliked ? 'text-red-500' : ''}`}
+          onClick={() => onReaction(categoryId, note.id, "dislike")}
+          className={`flex items-center gap-1 ${
+            hasDisliked ? "text-red-500" : ""
+          }`}
           title={
-            hasDisliked ? "You already disliked this" :
-            hasLiked ? "You already liked this" : 
-            "Dislike this note"
+            hasDisliked
+              ? "You already disliked this"
+              : hasLiked
+              ? "You already liked this"
+              : "Dislike this note"
           }
         >
           <ThumbsDown size={14} />
@@ -100,75 +126,61 @@ const NoteItem: React.FC<NoteProps> = ({
   );
 };
 
-const NotesContainer: React.FC<NotesContainerProps> = ({ categoryId, children }) => {
-  return (
-    <div className="flex flex-col gap-3 min-h-[100px]">
-      {children}
-    </div>
-  );
-};
 
 function Retrospective() {
   const { user } = useAuth();
-  const [scale, setScale] = useState(1);
+  const navigate = useNavigate(); 
   const [nickname, setNickname, allNicknames] = useNicknames();
   const userId = useMyId();
   const [isChatOpen, setIsChatOpen] = useState(false);
-  
+  const [showUsersModal, setShowUsersModal] = useState(false);
+
+  const joinUrl = useJoinUrl();
+  const connectedUsers = useConnectedUsers();
 
   useEffect(() => {
-    if (user) {
-      setNickname(user.email || 'Anonymous');
-    }
-  },[user]);
-
-  const boardRef = useRef<HTMLDivElement>(null);
+    setNickname(user?.email || "Anonymous");
+  }, [user, joinUrl, setNickname, nickname]);
 
 
-  const [categories, setCategories] = useStateTogether<Category[]>("categories",[
-    {
-      id: '1',
-      title: 'Whats working?',
-      color: 'bg-yellow-200',
-      notes: []
-    },
-    {
-      id: '2',
-      title: 'What improvements should we do?',
-      color: 'bg-green-400',
-      notes: []
-    },
-    {
-      id: '3',
-      title: "Whats not working?",
-      color: 'bg-red-200',
-      notes: []
-    },
-    {
-      id: '4',
-      title: 'Helpfull last sprint improvements?',
-      color: 'bg-blue-300',
-      notes: []
-    }
-  ]);
+  const [categories, setCategories] = useStateTogether<Category[]>(
+    "categories",
+    [
+      {
+        id: "1",
+        title: "Whats working?",
+        color: "bg-yellow-200",
+        notes: [],
+      },
+      {
+        id: "2",
+        title: "Improvements list",
+        color: "bg-green-400",
+        notes: [],
+      },
+      {
+        id: "3",
+        title: "Whats not working?",
+        color: "bg-red-200",
+        notes: [],
+      },
+      {
+        id: "4",
+        title: "Previous improvements",
+        color: "bg-blue-300",
+        notes: [],
+      },
+    ]
+  );
 
-
-  const [newNote, setNewNote] = useState<string>('');
+  const [newNote, setNewNote] = useState<string>("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [activeNote, setActiveNote] = useState<{ categoryId: string; noteId: string } | null>(null);
-  const [newComment, setNewComment] = useState<string>('');
-
-  const handleZoomIn = () => {
-    setScale(prev => Math.min(prev + 0.1, 2));
-  };
-
-  const handleZoomOut = () => {
-    setScale(prev => Math.max(prev - 0.1, 0.5));
-  };
-
-  const resetZoom = () => {
-    setScale(1);
-  };
+  const [activeNote, setActiveNote] = useState<{
+    categoryId: string;
+    noteId: string;
+  } | null>(null);
+  const [newComment, setNewComment] = useState<string>("");
+  const leaveSession = useLeaveSession();
 
   const addNote = (categoryId: string) => {
     if (!newNote.trim()) return;
@@ -180,24 +192,31 @@ function Retrospective() {
       dislikes: 0,
       comments: [],
       likedBy: [], // Initialize empty array
-      dislikedBy: [] // Initialize empty array
+      dislikedBy: [], // Initialize empty array
     };
 
-    setCategories(categories.map(category => 
-      category.id === categoryId 
-        ? { ...category, notes: [...category.notes, note] }
-        : category
-    ));
-    setNewNote('');
+    setCategories(
+      categories.map((category) =>
+        category.id === categoryId
+          ? { ...category, notes: [...category.notes, note] }
+          : category
+      )
+    );
+    setNewNote("");
     setActiveCategory(null);
   };
 
   const deleteNote = (categoryId: string, noteId: string) => {
-    setCategories(categories.map(category => 
-      category.id === categoryId 
-        ? { ...category, notes: category.notes.filter(note => note.id !== noteId) }
-        : category
-    ));
+    setCategories(
+      categories.map((category) =>
+        category.id === categoryId
+          ? {
+              ...category,
+              notes: category.notes.filter((note) => note.id !== noteId),
+            }
+          : category
+      )
+    );
     if (activeNote?.noteId === noteId) {
       setActiveNote(null);
     }
@@ -209,170 +228,190 @@ function Retrospective() {
     const comment: Comment = {
       id: Math.random().toString(36).substr(2, 9),
       text: newComment,
-      author: nickname || 'Anonymous', // Use the actual nickname
-      timestamp: new Date().toISOString() // Store as ISO string instead of Date object
+      author: nickname || "Anonymous", // Use the actual nickname
+      timestamp: new Date().toISOString(), // Store as ISO string instead of Date object
     };
 
-    setCategories(categories.map(category => 
-      category.id === categoryId
-        ? {
-            ...category,
-            notes: category.notes.map(note =>
-              note.id === noteId
-                ? { ...note, comments: [...note.comments, comment] }
-                : note
-            )
-          }
-        : category
-    ));
-    setNewComment('');
+    setCategories(
+      categories.map((category) =>
+        category.id === categoryId
+          ? {
+              ...category,
+              notes: category.notes.map((note) =>
+                note.id === noteId
+                  ? { ...note, comments: [...note.comments, comment] }
+                  : note
+              ),
+            }
+          : category
+      )
+    );
+    setNewComment("");
   };
 
-  const handleReaction = (categoryId: string, noteId: string, type: 'like' | 'dislike') => {
-    setCategories(categories.map(category => 
-      category.id === categoryId
-        ? {
-            ...category,
-            notes: category.notes.map(note => {
-              if (note.id !== noteId) return note;
-              
-              // Check if user has already reacted to this note
-              const hasLiked = userId ? note.likedBy?.includes(userId) : false;
-              const hasDisliked = userId ? note.dislikedBy?.includes(userId) : false;
-              
-              // If user has already liked the note and tries to like it again, remove the like
-                if (type === 'like' && hasLiked) {
-                    return {
+  const handleReaction = (
+    categoryId: string,
+    noteId: string,
+    type: "like" | "dislike"
+  ) => {
+    setCategories(
+      categories.map((category) =>
+        category.id === categoryId
+          ? {
+              ...category,
+              notes: category.notes.map((note) => {
+                if (note.id !== noteId) return note;
+
+                // Check if user has already reacted to this note
+                const hasLiked = userId
+                  ? note.likedBy?.includes(userId)
+                  : false;
+                const hasDisliked = userId
+                  ? note.dislikedBy?.includes(userId)
+                  : false;
+
+                // If user has already liked the note and tries to like it again, remove the like
+                if (type === "like" && hasLiked) {
+                  return {
                     ...note,
                     likes: note.likes - 1,
-                    likedBy: note.likedBy?.filter(id => id !== userId),
-                    };
+                    likedBy: note.likedBy?.filter((id) => id !== userId),
+                  };
                 }
                 // If user has already disliked the note and tries to dislike it again, remove the dislike
-                if (type === 'dislike' && hasDisliked) {
-                    return {
+                if (type === "dislike" && hasDisliked) {
+                  return {
                     ...note,
                     dislikes: note.dislikes - 1,
-                    dislikedBy: note.dislikedBy?.filter(id => id !== userId),
-                    };
+                    dislikedBy: note.dislikedBy?.filter((id) => id !== userId),
+                  };
                 }
                 // If the user liked it and tries to dislike it, remove the like and add the dislike
-                if (type === 'dislike' && hasLiked) {
-                    return {
+                if (type === "dislike" && hasLiked) {
+                  return {
                     ...note,
                     likes: note.likes - 1,
-                    likedBy: note.likedBy?.filter(id => id !== userId),
+                    likedBy: note.likedBy?.filter((id) => id !== userId),
                     dislikes: note.dislikes + 1,
                     dislikedBy: [...(note.dislikedBy || []), userId],
-                    };
+                  };
                 }
                 // If the user disliked it and tries to like it, remove the dislike and add the like
-                if (type === 'like' && hasDisliked) {
-                    return {
+                if (type === "like" && hasDisliked) {
+                  return {
                     ...note,
                     dislikes: note.dislikes - 1,
-                    dislikedBy: note.dislikedBy?.filter(id => id !== userId),
+                    dislikedBy: note.dislikedBy?.filter((id) => id !== userId),
                     likes: note.likes + 1,
                     likedBy: [...(note.likedBy || []), userId],
-                    };
+                  };
                 }
-              
-              return { 
-                ...note, 
-                likes: type === 'like' ? note.likes + 1 : note.likes,
-                dislikes: type === 'dislike' ? note.dislikes + 1 : note.dislikes,
-                likedBy: type === 'like' 
-                  ? [...(note.likedBy || []), userId] 
-                  : (note.likedBy || []),
-                dislikedBy: type === 'dislike' 
-                  ? [...(note.dislikedBy || []), userId] 
-                  : (note.dislikedBy || [])
-              };
-            })
-          }
-        : category
-    ));
+
+                return {
+                  ...note,
+                  likes: type === "like" ? note.likes + 1 : note.likes,
+                  dislikes:
+                    type === "dislike" ? note.dislikes + 1 : note.dislikes,
+                  likedBy:
+                    type === "like"
+                      ? [...(note.likedBy || []), userId]
+                      : note.likedBy || [],
+                  dislikedBy:
+                    type === "dislike"
+                      ? [...(note.dislikedBy || []), userId]
+                      : note.dislikedBy || [],
+                };
+              }),
+            }
+          : category
+      )
+    );
   };
 
-  const getCategoryHeight = (notesCount: number) => {
-    const baseHeight = 200;
-    const heightPerNote = 100;
-    const maxHeight = 800;
-    return Math.min(baseHeight + (notesCount * heightPerNote), maxHeight);
-  };
+  // Add go back function handler
+  const handleGoBack = useCallback(() => {
+    leaveSession();
+    navigate(-1); // Navigate back to previous page
+  }, [leaveSession, navigate]);
+
+  // Add this CSS override using useEffect
+  useEffect(() => {
+    // Add a style tag to override the rt-chat class
+    const styleTag = document.createElement('style');
+    styleTag.innerHTML = `
+      .rt-chat {
+        display: flex !important;
+      }
+    `;
+    document.head.appendChild(styleTag);
+    
+    // Clean up function to remove the style tag when component unmounts
+    return () => {
+      document.head.removeChild(styleTag);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       <div className="fixed top-0 left-0 right-0 bg-white z-10 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
-          <h1 className="text-xl font-semibold text-gray-900">Sprint Retrospective</h1>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {/* Add back button */}
             <button
-              onClick={handleZoomOut}
-              className="p-1.5 hover:bg-gray-100 rounded"
-              title="Zoom Out"
+              onClick={handleGoBack}
+              className="p-1.5 hover:bg-gray-100 rounded flex items-center text-gray-700"
+              title="Go Back"
             >
-              <ZoomOut size={18} />
+              <ArrowLeft size={18} />
             </button>
-            <button
-              onClick={resetZoom}
-              className="p-1.5 hover:bg-gray-100 rounded"
-              title="Reset Zoom"
-            >
-              <RotateCcw size={18} />
-            </button>
-            <button
-              onClick={handleZoomIn}
-              className="p-1.5 hover:bg-gray-100 rounded"
-              title="Zoom In"
-            >
-              <ZoomIn size={18} />
-            </button>
+            <h1 className="text-xl font-semibold text-gray-900">
+              Sprint Retrospective
+            </h1>
+          </div>
+          <div className="flex items-center">
             <button
               onClick={() => setIsChatOpen(!isChatOpen)}
-              className="ml-2 p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center"
+              className="p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center"
               title={isChatOpen ? "Close Chat" : "Open Chat"}
             >
               <MessageSquare size={18} />
-              {!isChatOpen && <span className="ml-1 hidden sm:inline">Chat</span>}
+              <span className="ml-1 hidden sm:inline">
+                {isChatOpen ? "Hide Chat" : "Show Chat"}
+              </span>
             </button>
           </div>
         </div>
       </div>
 
-      <div className="pt-16 p-6 flex-grow flex">
-        {/* Main content container with centered board that shifts when chat opens */}
-        <div 
-          className="flex-grow transition-all duration-300 flex justify-center"
+      <div className="pt-16 flex-grow flex">
+        {/* Main content container with horizontal scrolling for categories */}
+        <div
+          className="w-full transition-all duration-300 overflow-x-auto"
           style={{
-            marginRight: isChatOpen ? '384px' : '0',
-            width: '100%',
-            justifyContent: isChatOpen ? 'flex-start' : 'center',
+            marginRight: isChatOpen ? "384px" : "0",
           }}
         >
-          <div
-            ref={boardRef}
-            style={{
-              transform: `scale(${scale})`,
-              transformOrigin: isChatOpen ? 'left top' : 'center top',
-              transition: 'transform 0.2s ease-out, transform-origin 0.3s ease-out',
-            }}
-            className="h-full"
+          <div 
+            className="py-6 px-4 min-w-max mx-auto transition-all duration-300"
           >
-            <div className="flex flex-nowrap gap-4 overflow-x-auto pb-4">
-              {categories.map(category => (
-                <div 
-                  key={category.id} 
-                  className="bg-white rounded-lg p-4 flex flex-col flex-shrink-0"
+            <div className="flex flex-nowrap gap-6">
+              {categories.map((category) => (
+                <div
+                  key={category.id}
+                  className="bg-white rounded-lg p-4 flex flex-col shadow-sm"
                   style={{
-                    width: '300px',
-                    height: '600px',
+                    width: "300px",
+                    height: "500px",
+                    flexShrink: 0, // Prevent shrinking
                   }}
                 >
-                  <h2 className="text-xl font-medium mb-4">{category.title}</h2>
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className={`w-4 h-4 ${category.color} rounded`}></div>
+                    <h2 className="text-xl font-medium">{category.title}</h2>
+                  </div>
 
                   <div className="flex-grow overflow-y-auto">
-                    <NotesContainer categoryId={category.id}>
+                    <div className="flex flex-col gap-3 min-h-[100px]">
                       {category.notes.map((note, index) => (
                         <NoteItem
                           key={note.id}
@@ -380,14 +419,18 @@ function Retrospective() {
                           index={index}
                           categoryId={category.id}
                           hasLiked={note.likedBy?.includes(userId) || false}
-                          hasDisliked={note.dislikedBy?.includes(userId) || false}
+                          hasDisliked={
+                            note.dislikedBy?.includes(userId) || false
+                          }
                           color={category.color}
                           onDelete={deleteNote}
                           onReaction={handleReaction}
-                          onComment={(categoryId, noteId) => setActiveNote({ categoryId, noteId })}
+                          onComment={(categoryId, noteId) =>
+                            setActiveNote({ categoryId, noteId })
+                          }
                         />
                       ))}
-                    </NotesContainer>
+                    </div>
                   </div>
 
                   {activeCategory === category.id ? (
@@ -397,7 +440,11 @@ function Retrospective() {
                         className={`w-full p-3 rounded shadow-sm ${category.color} text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
                         value={newNote}
                         onChange={(e) => setNewNote(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && addNote(category.id)}
+                        onKeyPress={(e) =>
+                          e.key === "Enter" &&
+                          !e.shiftKey &&
+                          addNote(category.id)
+                        }
                         rows={3}
                       />
                       <div className="flex justify-end gap-2 mt-2">
@@ -429,36 +476,97 @@ function Retrospective() {
             </div>
           </div>
         </div>
-          
+
         {/* Chat sidebar that doesn't overlay content */}
-        <div 
+        <div
           className={`fixed right-0 top-16 bottom-0 w-96 bg-white shadow-lg transition-all duration-300 z-10`}
           style={{
-            transform: isChatOpen ? 'translateX(0)' : 'translateX(100%)',
+            transform: isChatOpen ? "translateX(0)" : "translateX(100%)",
           }}
         >
           <div className="h-full p-4 pb-6 flex flex-col relative">
-            <button 
-              onClick={() => setIsChatOpen(false)}
-              className="absolute -left-10 top-4 bg-white p-2 rounded-l-md shadow-md"
-            >
-              <ChevronRight size={20} />
-            </button>
-            <h2 className="text-lg font-medium mb-3">Team Chat</h2>
-            <div className="flex-grow overflow-y-auto">
-              <Chat 
-                rtKey='chat' 
-                components={(props) => (
-                  <MessageRow 
-                    {...props} 
-                    senderId={allNicknames[props.senderId] || props.senderId} 
-                  />
-                )}
+            {isChatOpen && (
+              <button
+                onClick={() => setIsChatOpen(false)}
+                className="absolute -left-10 top-4 bg-white p-2 rounded-l-md shadow-md"
+              >
+                <ChevronRight size={20} />
+              </button>
+            )}
+            <div className="flex-grow flex">
+              <Chat
+                rtKey="chat"
+                components={{
+                  MessageRow: (props) => (
+                    <MessageRow
+                      {...props}
+                      senderId={allNicknames[props.senderId] || props.senderId}
+                    />
+                  ),
+                  ChatHeader: (props) => (
+                    <div className="flex items-center justify-between p-3 px-5 border-b">
+                      <span className="rt-chatHeader-title">Team Chat</span>
+                      <button 
+                          className="text-blue-500 hover:text-blue-700 text-sm font-medium"
+                          onClick={() => setShowUsersModal(true)}
+                        >
+                        {connectedUsers.length} users online
+                      </button>
+                    </div>
+                  ),
+                  MessageList: (props) => (
+                    <MessageList
+                      {...props}
+                      style={{display:'flex'}}
+                    />
+                  ),
+                }}
               />
             </div>
           </div>
         </div>
-        
+
+        {/* Connected Users Modal */}
+        {showUsersModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg w-full max-w-md p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-semibold">Connected Users</h3>
+                <button onClick={() => setShowUsersModal(false)}>
+                  <X size={24} className="text-gray-500 hover:text-gray-700" />
+                </button>
+              </div>
+              
+              <div className="max-h-80 overflow-y-auto">
+                <ul className="divide-y">
+                  {connectedUsers.map(({userId, nickname, isYou}) => (
+                    <li key={userId} className="py-3 flex items-center">
+                      <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
+                      <span className="text-gray-800">
+                        {nickname}
+                        {isYou && " (you)"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                
+                {connectedUsers.length === 0 && (
+                  <p className="text-gray-500 text-center py-4">No users connected</p>
+                )}
+              </div>
+              
+              <div className="mt-4 pt-3 border-t">
+                <button
+                  onClick={() => setShowUsersModal(false)}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 w-full"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Chat toggle button for mobile view */}
         {!isChatOpen && (
           <button
@@ -480,19 +588,27 @@ function Retrospective() {
                 <X size={24} className="text-gray-500 hover:text-gray-700" />
               </button>
             </div>
-            
+
             <div className="mb-4">
-              {categories.find(c => c.id === activeNote.categoryId)?.notes.find(n => n.id === activeNote.noteId)?.comments.map(comment => (
-                <div key={comment.id} className="bg-gray-50 p-3 rounded-lg mb-2">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm font-medium text-gray-900">{comment.author}</span>
-                    <span className="text-xs text-gray-500">
-                      {new Date(comment.timestamp).toLocaleString()}
-                    </span>
+              {categories
+                .find((c) => c.id === activeNote.categoryId)
+                ?.notes.find((n) => n.id === activeNote.noteId)
+                ?.comments.map((comment) => (
+                  <div
+                    key={comment.id}
+                    className="bg-gray-50 p-3 rounded-lg mb-2"
+                  >
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-medium text-gray-900">
+                        {comment.author}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {new Date(comment.timestamp).toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="text-gray-700">{comment.text}</p>
                   </div>
-                  <p className="text-gray-700">{comment.text}</p>
-                </div>
-              ))}
+                ))}
             </div>
 
             <div className="flex gap-2">
@@ -502,10 +618,15 @@ function Retrospective() {
                 className="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && addComment(activeNote.categoryId, activeNote.noteId)}
+                onKeyPress={(e) =>
+                  e.key === "Enter" &&
+                  addComment(activeNote.categoryId, activeNote.noteId)
+                }
               />
               <button
-                onClick={() => addComment(activeNote.categoryId, activeNote.noteId)}
+                onClick={() =>
+                  addComment(activeNote.categoryId, activeNote.noteId)
+                }
                 className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
               >
                 Send
