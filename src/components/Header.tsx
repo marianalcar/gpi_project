@@ -8,9 +8,6 @@ const Header = () => {
   const { user, signOut } = useAuth();
   const {currentRole} = useProject();
 
-  console.log(currentRole);
-  console.log(user);
-
   const handleSignOut = async () => {
     try {
       await signOut();
