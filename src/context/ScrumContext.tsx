@@ -37,6 +37,7 @@ export interface Sprint {
   capacity: number;
   status: 'Planned' | 'In Progress' | 'Completed';
   projectId: string;
+  retrospective_url: string | null;
 }
 
 interface ScrumContextType {
