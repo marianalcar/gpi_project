@@ -21,6 +21,7 @@ import {
 } from "react-together";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { useProject } from "../context/ProjectContext";
 
 interface Comment {
   id: string;
@@ -137,9 +138,14 @@ function Retrospective() {
 
   const joinUrl = useJoinUrl();
   const connectedUsers = useConnectedUsers();
+  const { projectUsers } = useProject();
 
   useEffect(() => {
-    setNickname(user?.email || "Anonymous");
+    if (!user) return;
+    const userInProject = projectUsers.find(
+      (projectUser) => projectUser.auth_id === user.id
+    );
+    setNickname(userInProject?.display_name || user?.email || "Anonymous");
   }, [user, joinUrl, setNickname, nickname]);
 
 
