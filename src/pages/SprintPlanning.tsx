@@ -211,18 +211,14 @@ const SprintPlanning = () => {
     }
   };
 
-  const getPriorityClass = (priority: string) => {
-    switch (priority) {
-      case 'High':
-        return 'bg-red-50 text-red-700';
-      case 'Medium':
-        return 'bg-amber-50 text-amber-700';
-      case 'Low':
-        return 'bg-green-50 text-green-700';
-      default:
-        return 'bg-gray-50 text-gray-700';
-    }
-  };
+    const getPriorityClass = (priority: string) => {
+        switch (priority) {
+            case 'High': return 'bg-red-100 text-red-800';
+            case 'Medium': return 'bg-yellow-100 text-yellow-800';
+            case 'Low': return 'bg-green-100 text-green-800';
+            default: return 'bg-gray-100 text-gray-800';
+        }
+    };
 
   // Draggable Task component
   const DraggableTask = ({ task }: { task: Task }) => {
@@ -250,13 +246,16 @@ const SprintPlanning = () => {
         <div className="flex justify-between items-start">
           <div className="flex-1">
             <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={selectedTasks.includes(task.id)}
-                onChange={() => toggleSelectTask(task.id)}
-                className="mr-2 h-4 w-4 text-indigo-600 focus:ring-indigo-500 rounded"
-                disabled={isDeveloperRole}
-              />
+                <span className={`mr-2 ${getPriorityClass(task.priority)} px-2 py-0.5 rounded`}>
+                    {task.priority}
+                </span>
+                <input
+                    type="checkbox"
+                    checked={selectedTasks.includes(task.id)}
+                    onChange={() => toggleSelectTask(task.id)}
+                    className="mr-2 h-4 w-4 text-indigo-600 focus:ring-indigo-500 rounded"
+                    disabled={isDeveloperRole}
+                />
               <h3 className="font-medium text-gray-900">{task.title}</h3>
             </div>
             <p className="text-sm text-gray-500 mt-1 line-clamp-2">{task.description}</p>
@@ -300,7 +299,12 @@ const SprintPlanning = () => {
       canDrop: () => !isDeveloperRole // Disable dropping for developers
     }));
 
-    const sprintTasks = tasks.filter(task => task.sprintId === sprint.id);
+    const sprintTasks = tasks
+        .filter(task => task.sprintId === sprint.id)
+        .sort((a, b) => {
+            const priorityOrder = { 'High': 3, 'Medium': 2, 'Low': 1 };
+            return priorityOrder[b.priority] - priorityOrder[a.priority];
+        });
     const isExpanded = expandedSprints.includes(sprint.id);
     
     // Calculate total story points
@@ -466,9 +470,12 @@ const SprintPlanning = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {sprints.map(sprint => (
-                  <DroppableSprint key={sprint.id} sprint={sprint} />
-                ))}
+                {sprints
+                    .slice()
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map(sprint => (
+                        <DroppableSprint key={sprint.id} sprint={sprint} />
+                    ))}
               </div>
             )}
           </div>

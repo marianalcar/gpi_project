@@ -81,15 +81,25 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   /**
    * Fetch tasks from Supabase on component mount
    */
-  const fetchTasks = async () => {
-    if (!currentProject) return;
-    const { data, error } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('projectId', currentProject.id); // Fetch only current proj task
-    if (error) console.error('Error fetching tasks:', error);
-    else setTasks(data || []);
-  };
+    const fetchTasks = async () => {
+        if (!currentProject) return;
+
+        try {
+            const { data, error, count } = await supabase
+                .from('tasks')
+                .select('*', { count: 'exact' })
+                .eq('projectId', currentProject.id)
+                .limit(1000) // Limite máximo de registros
+                .order('createdAt', { ascending: false });
+
+            if (error) throw error;
+            setTasks(data || []);
+        } catch (error) {
+            console.error('Error fetching tasks:', error);
+            // Implementar retentativas
+            setTimeout(() => fetchTasks(), 2000); // Tenta novamente após 2 segundos
+        }
+    };
   /**
    * Fetch sprints from Supabase
    */

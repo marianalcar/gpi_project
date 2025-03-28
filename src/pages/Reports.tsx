@@ -19,6 +19,7 @@ const Reports = () => {
     const [currentSprintId, setCurrentSprintId] = useState<string>('');
     const [globalBurndownData, setGlobalBurndownData] = useState<any[]>([]);
     const [selectedSprintFilter, setSelectedSprintFilter] = useState<string>('all');
+    const [selectedTeamSprintFilter, setSelectedTeamSprintFilter] = useState<string>('all');
 
     // Fetch data when project changes
     useEffect(() => {
@@ -154,34 +155,46 @@ const Reports = () => {
     }, [currentProject, tasks, sprints, selectedSprintFilter]);
 
     // Get team performance data
+    // Substitua a função getTeamPerformanceData() existente por esta:
     const getTeamPerformanceData = () => {
         if (!tasks.length) return [];
 
-        // Group tasks by assignee
+        const filteredTasks = selectedTeamSprintFilter === 'all'
+            ? tasks
+            : tasks.filter(task => task.sprintId === selectedTeamSprintFilter);
+
         const assigneeMap = new Map();
 
-        tasks.forEach(task => {
-            if (!task.assignee) return;
+        filteredTasks.forEach(task => {
+            if (!task.assignees || task.assignees.length === 0) return;
 
-            if (!assigneeMap.has(task.assignee)) {
-                assigneeMap.set(task.assignee, {
-                    member: task.assignee,
-                    role: 'Team Member', // Would need to fetch from user data in a real implementation
-                    completed: 0,
-                    inProgress: 0,
-                    total: 0
-                });
-            }
+            task.assignees.forEach(assignee => {
+                if (!assigneeMap.has(assignee)) {
+                    assigneeMap.set(assignee, {
+                        member: assignee,
+                        role: 'Team Member',
+                        completed: 0,
+                        completedPoints: 0,
+                        inProgress: 0,
+                        inProgressPoints: 0,
+                        total: 0,
+                        totalPoints: 0
+                    });
+                }
 
-            const userData = assigneeMap.get(task.assignee);
+                const userData = assigneeMap.get(assignee);
 
-            if (task.status === 'Done') {
-                userData.completed += 1;
-            } else if (task.status === 'In Progress') {
-                userData.inProgress += 1;
-            }
+                if (task.status === 'Done') {
+                    userData.completed += 1;
+                    userData.completedPoints += task.storyPoints;
+                } else if (task.status === 'In Progress' || task.status === 'Review') {
+                    userData.inProgress += 1;
+                    userData.inProgressPoints += task.storyPoints;
+                }
 
-            userData.total += 1;
+                userData.total += 1;
+                userData.totalPoints += task.storyPoints;
+            });
         });
 
         return Array.from(assigneeMap.values());
@@ -208,7 +221,7 @@ const Reports = () => {
                 storyPoints: storyPoints,
                 velocity: completedPoints
             };
-        }).sort((a, b) => b.id.localeCompare(a.id)); // Sort by sprint ID descending (assuming IDs are time-based)
+        }).sort((a, b) => a.name.localeCompare(b.name))
     };
 
     const exportToPDF = (chartId, chartName) => {
@@ -240,6 +253,8 @@ const Reports = () => {
                                 exportToPDF('velocity-chart', 'velocity-chart');
                             } else if (activeTab === 'burndown') {
                                 exportToPDF('burndown-chart', 'burndown-chart');
+                            } else if (activeTab === 'team') {
+                                exportToPDF('team-performance-chart', 'team-performance-chart');
                             }
                         }}
                     >
@@ -484,17 +499,34 @@ const Reports = () => {
                             <div className="flex justify-between items-center mb-6">
                                 <div>
                                     <h2 className="text-lg font-semibold text-gray-800">Team Performance</h2>
+                                    <p className="text-sm text-gray-500">
+                                        {selectedTeamSprintFilter === 'all'
+                                            ? 'All Project Tasks'
+                                            : `Sprint: ${sprints.find(s => s.id === selectedTeamSprintFilter)?.name || ''}`}
+                                    </p>
                                 </div>
                                 <div className="flex items-center space-x-3">
-                                    <button className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
-                                        <Filter size={16} />
-                                        <span>Filter</span>
-                                    </button>
+                                    <select
+                                        className="px-3 py-2 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                        value={selectedTeamSprintFilter}
+                                        onChange={(e) => setSelectedTeamSprintFilter(e.target.value)}
+                                    >
+                                        <option value="all">All Project</option>
+                                        {sprints
+                                            .slice() // Cria cópia para não alterar o array original
+                                            .sort((a, b) => a.name.localeCompare(b.name)) // Ordenação A-Z
+                                            .map(sprint => (
+                                                <option key={sprint.id} value={sprint.id}>
+                                                    {sprint.name}
+                                                </option>
+                                            ))
+                                        }
+                                    </select>
                                 </div>
                             </div>
 
                             {getTeamPerformanceData().length > 0 ? (
-                                <div className="h-80 mb-6">
+                                <div className="h-80 mb-6" id="team-performance-chart">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <BarChart
                                             data={getTeamPerformanceData()}
@@ -504,10 +536,13 @@ const Reports = () => {
                                             <CartesianGrid strokeDasharray="3 3" />
                                             <XAxis type="number" />
                                             <YAxis dataKey="member" type="category" width={150} />
-                                            <Tooltip />
+                                            <Tooltip
+                                                formatter={(value, name) => [`${value} points`, name]}
+                                                labelFormatter={() => ''}
+                                            />
                                             <Legend />
-                                            <Bar dataKey="completed" name="Completed Tasks" stackId="a" fill="#82ca9d" />
-                                            <Bar dataKey="inProgress" name="In Progress" stackId="a" fill="#8884d8" />
+                                            <Bar dataKey="completedPoints" name="Completed Points" stackId="a" fill="#4ade80" />
+                                            <Bar dataKey="inProgressPoints" name="In Progress Points" stackId="a" fill="#818cf8" />
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -523,8 +558,8 @@ const Reports = () => {
                                         <tr>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Team Member</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completed Tasks</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">In Progress</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completed Points</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">In Progress Points</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completion Rate</th>
                                         </tr>
                                     </thead>
@@ -540,10 +575,10 @@ const Reports = () => {
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.role}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.completed}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.inProgress}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.completedPoints}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.inProgressPoints}</td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                    {Math.round((member.completed / (member.completed + member.inProgress)) * 100) || 0}%
+                                                    {Math.round((member.completedPoints / member.totalPoints) * 100) || 0}%
                                                 </td>
                                             </tr>
                                         )) : (
@@ -561,16 +596,8 @@ const Reports = () => {
 
                     {activeTab === 'history' && (
                         <div>
-                            <div className="flex justify-between items-center mb-6">
-                                <div>
-                                    <h2 className="text-lg font-semibold text-gray-800">Sprint History</h2>
-                                </div>
-                                <div className="flex items-center space-x-3">
-                                    <button className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
-                                        <Filter size={16} />
-                                        <span>Filter</span>
-                                    </button>
-                                </div>
+                            <div className="mb-6">
+                                <h2 className="text-lg font-semibold text-gray-800">Sprint History</h2>
                             </div>
 
                             <div className="overflow-x-auto">

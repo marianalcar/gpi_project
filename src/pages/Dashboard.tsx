@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { format, parseISO, differenceInDays, subDays, addDays } from 'date-fns';
+import { format, parseISO, differenceInDays, subDays, addDays, formatDistanceToNow } from 'date-fns';
 import { 
   Calendar, 
   CheckCircle2, 
@@ -167,13 +167,29 @@ const Dashboard = () => {
             <h2 className="text-lg font-semibold text-gray-800">Team Members</h2>
             <button className="text-indigo-600 text-sm font-medium">View All</button>
           </div>
-          <div className="space-y-4">
-            <TeamMember name="Alex Johnson" role="Product Owner" tasks={8} />
-            <TeamMember name="Sarah Williams" role="Developer" tasks={12} />
-            <TeamMember name="Michael Brown" role="Developer" tasks={10} />
-            <TeamMember name="Emily Davis" role="Designer" tasks={6} />
-            <TeamMember name="Robert Wilson" role="QA Engineer" tasks={9} />
-          </div>
+                <div className="space-y-4">
+                    {tasks
+                        .filter(task => task.assignees && task.assignees.length > 0)
+                        .reduce<Array<{ name: string; tasks: number }>>((members, task) => { // Add type annotation
+                            task.assignees?.forEach(assignee => {
+                                if (!members.find(m => m.name === assignee)) {
+                                    members.push({
+                                        name: assignee,
+                                        tasks: tasks.filter(t => t.assignees?.includes(assignee)).length
+                                    });
+                                }
+                            });
+                            return members;
+                        }, [])
+                        .map((member, index) => (
+                            <TeamMember
+                                key={index}
+                                name={member.name}
+                                role="Team Member"
+                                tasks={member.tasks}
+                            />
+                        ))}
+                </div>
         </div>
       </div>
       
@@ -214,33 +230,23 @@ const Dashboard = () => {
             <h2 className="text-lg font-semibold text-gray-800">Recent Activities</h2>
             <button className="text-indigo-600 text-sm font-medium">View All</button>
           </div>
-          <div className="space-y-4">
-            <Activity 
-              user="Sarah Williams" 
-              action="completed task" 
-              item="Implement search functionality" 
-              time="2 hours ago"
-            />
-            <Activity 
-              user="Michael Brown" 
-              action="added comment on" 
-              item="API documentation task" 
-              time="4 hours ago"
-            />
-            <Activity 
-              user="Emily Davis" 
-              action="moved task" 
-              item="Design user profile page" 
-              time="Yesterday"
-              detail="from In Progress to Review"
-            />
-            <Activity 
-              user="Alex Johnson" 
-              action="created new task" 
-              item="Prepare for sprint review" 
-              time="Yesterday"
-            />
-          </div>
+                <div className="space-y-4">
+                    {tasks
+                        .filter(task => task.status === 'Done' && task.completedAt)
+                        .sort((a, b) =>
+                            new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime()
+                        )
+                        .slice(0, 4)
+                        .map(task => (
+                            <Activity
+                                key={task.id}
+                                user={task.assignees?.join(', ') || "Unassigned"}
+                                action="completed task"
+                                item={task.title}
+                                time={formatDistanceToNow(new Date(task.completedAt)) + " ago"}
+                            />
+                        ))}
+                </div>
         </div>
       </div>
     </div>
