@@ -7,6 +7,13 @@ export interface Role_data {
   auth_id: string;
   role_type: Role;
 }
+
+export interface ProjectUser {
+  auth_id: string;
+  display_name: string;
+  role: string;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -25,6 +32,9 @@ export enum Role {
 
 
 interface ProjectContextType {
+  projectUsers: ProjectUser[];
+  fetchProjectUsers: () => Promise<void>;
+  updateOwnDisplayName: (userId: string, newName: string) => Promise<void>;
   currentProject: Project | null;
   userProjects: Project[];
   allProjects: Project[];
@@ -40,6 +50,8 @@ interface ProjectContextType {
   loadAllProjects: () => Promise<void>;
 }
 
+
+
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
@@ -49,6 +61,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentRole, setCurrentRole] = useState<Role | null>(null);
+  const [projectUsers, setProjectUsers] = useState<ProjectUser[]>([]);
 
   const loadAllProjects = async () => {
     try {
@@ -143,6 +156,64 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
   }, [user]);
 
+  // THIS FETCHES USERS FOR THE CURRENT PROJECT and passes it down to current sprint or anywhere needed.
+  const fetchProjectUsers = async () => {
+    if (!currentProject) return;
+  
+    //console.log("Fetching users for project:", currentProject.id);
+  
+    //Fetch auth_id from roles table
+    const { data: projectUsersData, error } = await supabase
+      .from("roles")
+      .select("auth_id, role_type") 
+      .eq("project_id", currentProject.id);
+  
+    if (error) {
+      console.error("Error fetching project users:", error);
+      return;
+    }
+  
+    //console.log("These users are inside the list:", projectUsersData);
+  
+    //Get display names from 'users' table using auth_id
+    const authIds = projectUsersData.map((user) => user.auth_id);
+  
+    const { data: usersTableData, error: usersTableError } = await supabase
+      .from("users")
+      .select("auth_id, display_name")
+      .in("auth_id", authIds);
+  
+    if (usersTableError) {
+      console.error("Error fetching display names from users table:", usersTableError);
+      return;
+    }
+  
+    //Create a map of auth_id => display_name
+    const displayNameMap = new Map(
+      usersTableData
+        .filter((user) => user.display_name && user.display_name.trim() !== "No Name") // Remove "No Name" users
+        .map((user) => [user.auth_id, user.display_name])
+    );
+  
+    //Combine role data with display names
+    const usersWithNames: ProjectUser[] = projectUsersData
+    .filter((user) => displayNameMap.has(user.auth_id)) // Ensure only users with valid names
+    .map((user) => ({
+      auth_id: user.auth_id,
+      role: user.role_type,
+      display_name: displayNameMap.get(user.auth_id) || "Unknown",
+    }));
+  
+    //Save to state
+    setProjectUsers(usersWithNames);
+    console.log("Final Project Users List:", usersWithNames);
+  };
+  
+  //  Fetch project users when current project changes
+  useEffect(() => {
+    fetchProjectUsers();
+  }, [currentProject]);
+
   useEffect( () => {
     if (!user || !currentProject) return;
 
@@ -164,7 +235,26 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       };
       loadRole();
     }, [currentProject, user]);
+    const updateOwnDisplayName = async (userId: string, newName: string) => {
+    if (user?.id === userId) {
+      const { error: authError } = await supabase.auth.updateUser({
+        data: { display_name: newName },
+      });
 
+      if (authError) {
+        console.error("Error updating auth display name:", authError);
+        return;
+      }
+    }
+
+    const { error: dbError } = await supabase
+      .from("users")
+      .upsert({ auth_id: userId, display_name: newName }, { onConflict: "auth_id" });
+
+    if (dbError) {
+      console.error("Error updating display name in users table:", dbError);
+    }
+  };
 
   const createProject = async (name: string, description?: string) => {
     try {
@@ -235,6 +325,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         currentRole,
         userProjects,
         allProjects,
+        projectUsers,
         loading,
         error,
         createProject,
@@ -243,6 +334,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setCurrentProject,
         loadUserProjects,
         loadAllProjects,
+        updateOwnDisplayName,
+        fetchProjectUsers,
+        setCurrentRole,
       }}
     >
       {children}

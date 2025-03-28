@@ -11,10 +11,11 @@ export interface Task {
   storyPoints: number;
   status: 'New' | 'Ready' | 'In Sprint' | 'To Do' | 'In Progress' | 'Review' | 'Done';
   createdAt: string;
-  assignee?: string;
+  assignees?: string[];
   storyId?: string;
   sprintId?: string;
   projectId: string;
+  completedAt: string | null;
 }
 
 export interface Story {
@@ -76,6 +77,7 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [tasks, setTasks] = useState<Task[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
   const [sprints, setSprints] = useState<Sprint[]>([]);
+  
 
   /**
    * Fetch tasks from Supabase on component mount
@@ -138,7 +140,7 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
    */
   const addTask = async (task: Omit<Task, 'id' | 'createdAt' | 'projectId'>) => {
     if (!currentProject) return;
-    const newTask = { ...task, createdAt: new Date().toISOString(), projectId: currentProject.id };
+    const newTask = { ...task, createdAt: new Date().toISOString(), projectId: currentProject.id};
   
     const { data, error } = await supabase.from('tasks').insert([newTask]).select();
     if (error) console.error('Error adding task:', error);
@@ -149,13 +151,18 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
    */
   const updateTask = async (updatedTask: Task) => {
     if (!currentProject) return;
+    // Ensure assignees are always stored as an array
+  const safeTask = {
+    ...updatedTask,
+    assignees: updatedTask.assignees || [], //  Prevents undefined errors
+  };
     const { error } = await supabase
       .from('tasks')
       .update(updatedTask)
       .eq('id', updatedTask.id)
       .eq('projectId', currentProject.id); // Ensure task belongs to selected project
     if (error) console.error('Error updating task:', error);
-    else setTasks(tasks.map(task => (task.id === updatedTask.id ? updatedTask : task)));
+    else setTasks(tasks.map(task => (task.id === updatedTask.id ? safeTask  : task)));
   };
 
   /**
@@ -192,7 +199,9 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       .eq('id', updatedStory.id)
       .eq('projectId', currentProject.id); // Ensure story belongs to selected project
     if (error) console.error('Error updating story:', error);
-    else setStories(stories.map(story => (story.id === updatedStory.id ? updatedStory : story)));
+    else setStories((prevStories) =>
+      prevStories.map((story) => (story.id === updatedStory.id ? updatedStory : story))
+    );
   };
   /**
    * Delete a story from Supabase
@@ -269,7 +278,17 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const moveTaskStatus = async (taskId: string, newStatus: Task['status']) => {
-    await updateTask({ ...tasks.find(t => t.id === taskId)!, status: newStatus });
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+  
+    // Atualiza o campo completedAt com base no novo status
+    const updatedTask = {
+      ...task,
+      status: newStatus,
+      completedAt: newStatus === 'Done' ? new Date().toISOString() : null, // Define completedAt se a tarefa for marcada como "Done"
+    };
+  
+    await updateTask(updatedTask);
   };
 
   const bulkAssignTasksToSprint = async (taskIds: string[], sprintId: string) => {
