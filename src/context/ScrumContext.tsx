@@ -15,6 +15,7 @@ export interface Task {
   storyId?: string;
   sprintId?: string;
   projectId: string;
+  completedAt: string | null;
 }
 
 export interface Story {
@@ -276,7 +277,17 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const moveTaskStatus = async (taskId: string, newStatus: Task['status']) => {
-    await updateTask({ ...tasks.find(t => t.id === taskId)!, status: newStatus });
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+  
+    // Atualiza o campo completedAt com base no novo status
+    const updatedTask = {
+      ...task,
+      status: newStatus,
+      completedAt: newStatus === 'Done' ? new Date().toISOString() : null, // Define completedAt se a tarefa for marcada como "Done"
+    };
+  
+    await updateTask(updatedTask);
   };
 
   const bulkAssignTasksToSprint = async (taskIds: string[], sprintId: string) => {
