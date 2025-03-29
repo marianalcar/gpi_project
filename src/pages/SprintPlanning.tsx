@@ -255,26 +255,24 @@ const SprintPlanning = () => {
             return;
           }
           
-          const name = getSessionNameFromUrl(new URL(joinUrl));
-          const password = getSessionPasswordFromUrl(new URL(joinUrl));
-          const cleanUrl = getCleanUrl(new URL(joinUrl));
           //remove the /sprint-planning from the url
-          const newUrl = cleanUrl.toString().replace('/sprint-planning', '/retrospective');
+          const newUrl = joinUrl.toString().replace('/sprint-planning', '/retrospective');
           
-          const newJoinUrl = getJoinUrl(new URL(newUrl), name, password).toString();
+          // remove all the characters until "/retrospective" is found
+          const retrospectiveUrl = newUrl.substring(newUrl.indexOf('/retrospective'));
           
           await updateSprint({
             ...sprint,
-            retrospective_url: newJoinUrl,
+            retrospective_url: retrospectiveUrl,
           });
           
-          console.log("Updated sprint with retrospective URL:", newJoinUrl);
+          console.log("Updated sprint with retrospective URL:", retrospectiveUrl);
           
           // Reset pending sprint ID
           setPendingSprintId(null);
           
           // Navigate to the URL
-          window.location.href = newJoinUrl;
+          window.location.href = newUrl;
         } catch (error) {
           console.error("Error updating sprint with retrospective URL:", error);
           setIsCreatingSession(false);
@@ -294,7 +292,10 @@ const SprintPlanning = () => {
       if (retrospective) {
         console.log("retrospective", retrospective);
         // navigate to the retrospective instead of opening in a new window
-        window.location.href = retrospective;
+        // construct a full URL based on current window location
+        const baseUrl = window.location.origin;
+        console.log("hole url", `${baseUrl}${retrospective}`);
+        window.location.href = `${baseUrl}${retrospective}`;
       }
       else {
         // Start the session creation process
@@ -311,8 +312,11 @@ const SprintPlanning = () => {
     const sprint = sprints.find(s => s.id === sprintId);
     const retrospective = sprint?.retrospective_url;
     if (sprint && retrospective) {
-        // Navigate to the URL instead of opening a new window
-        window.location.href = retrospective;
+        
+      // construct a full URL based on current window location
+      const baseUrl = window.location.origin;
+      console.log("hole url", `${baseUrl}${retrospective}`);
+      window.location.href = `${baseUrl}${retrospective}`;
     }
   };
 
