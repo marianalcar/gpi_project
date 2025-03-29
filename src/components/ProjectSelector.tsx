@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronUp, Plus, Edit3, Trash2, AlertCircle, Search } from 'lucide-react';
+import { ChevronUp, Plus, Edit3, Trash2, AlertCircle, Search, UserPlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '../lib/supabase';
 import { useProject } from '../context/ProjectContext';
@@ -23,7 +23,9 @@ const ProjectSelector = () => {
   const [isSlideUpOpen, setIsSlideUpOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [role, setRole] = useState<string>('DEVELOPER');
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -32,6 +34,7 @@ const ProjectSelector = () => {
     sprintDuration: 2,
     status: 'Active' as const
   });
+  const [inviteEmail, setInviteEmail] = useState('');
   const { user } = useAuth();
   const navigate = useNavigate();
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -81,6 +84,12 @@ const ProjectSelector = () => {
     setIsSlideUpOpen(false);
   };
 
+  const handleOpenInviteModal = (project: Project) => {
+    setEditingProject(project);
+    setIsInviteModalOpen(true);
+    setIsSlideUpOpen(false);
+  };
+
   const handleSubmit = async () => {
     try {
       if (editingProject) {
@@ -91,7 +100,7 @@ const ProjectSelector = () => {
 
         if (error) throw error;
 
-        // Update current project if it was the one being edited <-  
+        // Update current project if it was the one being edited
         if (currentProject?.id === editingProject.id) {
           setCurrentProject({ ...editingProject, ...formData });
         }
@@ -114,6 +123,38 @@ const ProjectSelector = () => {
       loadUserProjects();
     } catch (error) {
       console.error('Error saving project:', error);
+      // Here you would typically show an error message to the user
+    }
+  };
+
+  const handleInvite = async () => {
+    try {
+      console.log('Inviting user with email:', inviteEmail);
+      
+      const { error } = await supabase
+        .from('project_invitations')
+        .insert([{
+          project_id: editingProject?.id,
+          status: 'pending', // Assuming the initial status is 'pending'
+          created_at: new Date().toISOString(),
+          expires_at: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString(), // Assuming the invitation expires in 7 days
+          invited_user: inviteEmail, // Use the fetched user email
+          inviter_user: (await supabase.auth.getUser()).data.user?.id, // Assuming the inviter is the current authenticated user
+          project_name: editingProject?.name,
+          role: role
+        }]);
+  
+      if (error) {
+        console.error('Error inserting invitation:', error);
+        throw error;
+      }
+  
+      console.log('Invitation successfully inserted');
+  
+      setIsInviteModalOpen(false);
+      setInviteEmail('');
+    } catch (error) {
+      console.error('Error inviting user:', error);
       // Here you would typically show an error message to the user
     }
   };
@@ -193,8 +234,8 @@ const ProjectSelector = () => {
             <button 
               className="w-full flex items-center px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 rounded" 
               onClick={() => {
-          navigate('/project-search');
-          setIsSlideUpOpen(false);
+                navigate('/project-search');
+                setIsSlideUpOpen(false);
               }}
             >
               <Search className="mr-2 text-gray-500" size={16} />
@@ -205,42 +246,51 @@ const ProjectSelector = () => {
           <div className="border-t border-gray-200 max-h-64 overflow-y-auto">
             {userProjects.length > 0 ? (
               userProjects.map(project => (
-          <div
-            key={project.id}
-            className="p-2 hover:bg-gray-50 flex items-center justify-between group"
-          >
-            <button
-              onClick={() => handleProjectChange(project)}
-              className="flex-1 flex items-center text-left px-2"
-            >
-              <div>
-                <div className="font-medium text-gray-900">{project.name}</div>
-                <div className="text-sm text-gray-500 truncate max-w-[180px]">
-            {project.description}
+                <div
+                  key={project.id}
+                  className="p-2 hover:bg-gray-50 flex items-center justify-between group"
+                >
+                  <button
+                    onClick={() => handleProjectChange(project)}
+                    className="flex-1 flex items-center text-left px-2"
+                  >
+                    <div>
+                      <div className="font-medium text-gray-900">{project.name}</div>
+                      <div className="text-sm text-gray-500 truncate max-w-[180px]">
+                        {project.description}
+                      </div>
+                      <div className="mt-1">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getProjectStatusColor(project.status)}`}>
+                          {project.status}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                  <div className="opacity-0 group-hover:opacity-100 flex items-center px-2 space-x-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenModal(project);
+                      }}
+                      className="p-1 text-gray-400 hover:text-gray-600"
+                    >
+                      <Edit3 size={16} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenInviteModal(project);
+                      }}
+                      className="p-1 text-gray-400 hover:text-gray-600"
+                    >
+                      <UserPlus size={16} />
+                    </button>
+                  </div>
                 </div>
-                <div className="mt-1">
-            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getProjectStatusColor(project.status)}`}>
-              {project.status}
-            </span>
-                </div>
-              </div>
-            </button>
-            <div className="opacity-0 group-hover:opacity-100 flex items-center px-2">
-              <button
-                onClick={(e) => {
-            e.stopPropagation();
-            handleOpenModal(project);
-                }}
-                className="p-1 text-gray-400 hover:text-gray-600"
-              >
-                <Edit3 size={16} />
-              </button>
-            </div>
-          </div>
               ))
             ) : (
               <div className="px-4 py-6 text-center text-gray-500 text-sm">
-          No projects found
+                No projects found
               </div>
             )}
           </div>
@@ -357,6 +407,57 @@ const ProjectSelector = () => {
                     {editingProject ? 'Update Project' : 'Create Project'}
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Invite People Modal */}
+      {isInviteModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="p-6">
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">
+                Invite People to {editingProject?.name}
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-black"
+                    placeholder="Enter email address"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                  <select
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-black"
+                  >
+                    <option value="PRODUCT_OWNER">Product Owner</option>
+                    <option value="SCRUM_MASTER">Scrum Master</option>
+                    <option value="DEVELOPER">Developer</option>
+                  </select>
+                </div>
+              </div>
+              <div className="mt-6 flex justify-between">
+                <button
+                  onClick={() => setIsInviteModalOpen(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleInvite}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                >
+                  Invite
+                </button>
               </div>
             </div>
           </div>

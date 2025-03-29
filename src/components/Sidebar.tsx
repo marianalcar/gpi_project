@@ -11,6 +11,7 @@ const Sidebar = () => {
     { path: '/current-sprint', name: 'Current Sprint', icon: <Sprint size={20} /> },
     { path: '/reports', name: 'Reports', icon: <BarChart3 size={20} /> },
   ];
+  
 
   return (
     <div className="w-60 bg-indigo-800 text-white flex flex-col h-full">
