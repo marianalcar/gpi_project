@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 import { format, addDays, parseISO, isAfter, isBefore } from 'date-fns';
 import { 
@@ -13,11 +13,16 @@ import {
   Edit3,
   ChevronDown,
   ChevronUp,
+  StickyNote,
   X,
   ArrowUpDown  // Adicione esta importação
 } from 'lucide-react';
 import { useScrumContext, Task, Sprint } from '../context/ScrumContext';
 import {useProject, Role} from '../context/ProjectContext';
+import { SessionManager, useCreateRandomSession, useJoinUrl } from 'react-together';
+import { redirect, useNavigate } from 'react-router-dom';
+import { getCleanUrl, getJoinUrl, getSessionNameFromUrl, getSessionPasswordFromUrl } from 'react-together/dist/utils';
+import {useSetSession} from '@croquet/react';
 
 // Item types for drag and drop
 const ItemTypes = {
@@ -78,11 +83,17 @@ const SprintPlanning = () => {
 			'Low': 1
 		};
 
+    
 		const priorityA = priorityValues[a.priority as keyof typeof priorityValues] || 0;
 		const priorityB = priorityValues[b.priority as keyof typeof priorityValues] || 0;
-
+    
 		return sortDirection === 'desc' ? priorityB - priorityA : priorityA - priorityB;
 	});
+  const createRandomSession = useCreateRandomSession();
+  const joinUrl = useJoinUrl();
+
+  const isScrumMasterRole = currentRole === Role.Scrum_master;
+
 
 	// Toggle sort direction
 	const toggleSortDirection = () => {
@@ -117,7 +128,8 @@ const SprintPlanning = () => {
         endDate: newSprint.endDate,
         goal: newSprint.goal || '',
         capacity: newSprint.capacity || 40,
-        status: newSprint.status as 'Planned' | 'In Progress' | 'Completed'
+        status: newSprint.status as 'Planned' | 'In Progress' | 'Completed',
+        retrospective_url: null,
       });//somehow this works without having a project.id  :V
     }
     
@@ -211,16 +223,96 @@ const SprintPlanning = () => {
     }
   };
 
-  const getPriorityClass = (priority: string) => {
-    switch (priority) {
-      case 'High':
-        return 'bg-red-50 text-red-700';
-      case 'Medium':
-        return 'bg-amber-50 text-amber-700';
-      case 'Low':
-        return 'bg-green-50 text-green-700';
-      default:
-        return 'bg-gray-50 text-gray-700';
+    const getPriorityClass = (priority: string) => {
+        switch (priority) {
+            case 'High': return 'bg-red-100 text-red-800';
+            case 'Medium': return 'bg-yellow-100 text-yellow-800';
+            case 'Low': return 'bg-green-100 text-green-800';
+            default: return 'bg-gray-100 text-gray-800';
+        }
+    };
+
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [pendingSprintId, setPendingSprintId] = useState<string | null>(null);
+  
+  // Effect to monitor joinUrl changes and complete the retrospective creation process
+  useEffect(() => {
+    // Only proceed if we're actively waiting for a joinUrl to be created
+    if (isCreatingSession && pendingSprintId && joinUrl) {
+      (async () => {
+        try {
+          setIsCreatingSession(false);
+          
+          // Look for the sprint with the given ID
+          const sprint = sprints.find(s => s.id === pendingSprintId);
+          if (!sprint) {
+            console.error("Sprint not found");
+            setPendingSprintId(null);
+            return;
+          }
+          
+          //remove the /sprint-planning from the url
+          const newUrl = joinUrl.toString().replace('/sprint-planning', '/retrospective');
+          
+          // remove all the characters until "/retrospective" is found
+          const retrospectiveUrl = newUrl.substring(newUrl.indexOf('/retrospective'));
+          
+          await updateSprint({
+            ...sprint,
+            retrospective_url: retrospectiveUrl,
+          });
+          
+          console.log("Updated sprint with retrospective URL:", retrospectiveUrl);
+          
+          // Reset pending sprint ID
+          setPendingSprintId(null);
+          
+          // Navigate to the URL
+          window.location.href = newUrl;
+        } catch (error) {
+          console.error("Error updating sprint with retrospective URL:", error);
+          setIsCreatingSession(false);
+          setPendingSprintId(null);
+        }
+      })();
+    }
+  }, [joinUrl, isCreatingSession, pendingSprintId, sprints, updateSprint]);
+
+  const handleRetrospectiveMaster = useCallback((sprintId: string) => {
+    console.log("master");
+    // Look for the sprint with the given ID
+    const sprint = sprints.find(s => s.id === sprintId);
+    if (sprint) {
+      // look if the sprint has a retrospective
+      const retrospective = sprint.retrospective_url;
+      if (retrospective) {
+        console.log("retrospective", retrospective);
+        // navigate to the retrospective instead of opening in a new window
+        // construct a full URL based on current window location
+        const baseUrl = window.location.origin;
+        console.log("hole url", `${baseUrl}${retrospective}`);
+        window.location.href = `${baseUrl}${retrospective}`;
+      }
+      else {
+        // Start the session creation process
+        console.log("no retrospective");
+        setIsCreatingSession(true);
+        setPendingSprintId(sprintId);
+        
+        createRandomSession();
+      }
+    }
+  }, [sprints, createRandomSession]);
+
+  const handleRetrospectiveOther = (sprintId: string) => {
+    const sprint = sprints.find(s => s.id === sprintId);
+    const retrospective = sprint?.retrospective_url;
+    if (sprint && retrospective) {
+        
+      // construct a full URL based on current window location
+      const baseUrl = window.location.origin;
+      console.log("hole url", `${baseUrl}${retrospective}`);
+      window.location.href = `${baseUrl}${retrospective}`;
     }
   };
 
@@ -250,13 +342,16 @@ const SprintPlanning = () => {
         <div className="flex justify-between items-start">
           <div className="flex-1">
             <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={selectedTasks.includes(task.id)}
-                onChange={() => toggleSelectTask(task.id)}
-                className="mr-2 h-4 w-4 text-indigo-600 focus:ring-indigo-500 rounded"
-                disabled={isDeveloperRole}
-              />
+                <span className={`mr-2 ${getPriorityClass(task.priority)} px-2 py-0.5 rounded`}>
+                    {task.priority}
+                </span>
+                <input
+                    type="checkbox"
+                    checked={selectedTasks.includes(task.id)}
+                    onChange={() => toggleSelectTask(task.id)}
+                    className="mr-2 h-4 w-4 text-indigo-600 focus:ring-indigo-500 rounded"
+                    disabled={isDeveloperRole}
+                />
               <h3 className="font-medium text-gray-900">{task.title}</h3>
             </div>
             <p className="text-sm text-gray-500 mt-1 line-clamp-2">{task.description}</p>
@@ -286,6 +381,37 @@ const SprintPlanning = () => {
     );
   };
 
+  // Add a loading indicator for retrospective button
+  const renderRetrospectiveButton = (sprint: Sprint) => {
+    if (isScrumMasterRole) {
+      return (
+        <button
+          onClick={() => handleRetrospectiveMaster(sprint.id)}
+          className="p-2 text-white hover:bg-blue-700 rounded-full bg-blue-600"
+          title="Join Retrospective"
+          disabled={isCreatingSession && pendingSprintId === sprint.id}
+        >
+          {isCreatingSession && pendingSprintId === sprint.id ? (
+            <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+          ) : (
+            <StickyNote size={18} />
+          )}
+        </button>
+      );
+    } else {
+      return (
+        <button
+          onClick={() => handleRetrospectiveOther(sprint.id)}
+          className="p-2 text-white hover:bg-blue-700 rounded-full bg-blue-600"
+          title='Join Retrospective'
+          disabled={!sprint.retrospective_url}
+        >
+          <StickyNote size={18} />
+        </button>
+      );
+    }
+  };
+
   // Droppable Sprint component
   const DroppableSprint = ({ sprint }: { sprint: Sprint }) => {
     const {currentRole} = useProject();
@@ -300,7 +426,12 @@ const SprintPlanning = () => {
       canDrop: () => !isDeveloperRole // Disable dropping for developers
     }));
 
-    const sprintTasks = tasks.filter(task => task.sprintId === sprint.id);
+    const sprintTasks = tasks
+        .filter(task => task.sprintId === sprint.id)
+        .sort((a, b) => {
+            const priorityOrder = { 'High': 3, 'Medium': 2, 'Low': 1 };
+            return priorityOrder[b.priority] - priorityOrder[a.priority];
+        });
     const isExpanded = expandedSprints.includes(sprint.id);
     
     // Calculate total story points
@@ -344,6 +475,7 @@ const SprintPlanning = () => {
               </div>
             </div>
             <div className="flex items-center space-x-2">
+              {renderRetrospectiveButton(sprint)}
               <button 
                 onClick={() => handleEditSprint(sprint)}
                 className="p-1 text-gray-400 hover:text-gray-600"
@@ -466,9 +598,12 @@ const SprintPlanning = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {sprints.map(sprint => (
-                  <DroppableSprint key={sprint.id} sprint={sprint} />
-                ))}
+                {sprints
+                    .slice()
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map(sprint => (
+                        <DroppableSprint key={sprint.id} sprint={sprint} />
+                    ))}
               </div>
             )}
           </div>

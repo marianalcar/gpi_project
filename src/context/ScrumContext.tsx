@@ -15,6 +15,7 @@ export interface Task {
   storyId?: string;
   sprintId?: string;
   projectId: string;
+  completedAt: string | null;
 }
 
 export interface Story {
@@ -36,6 +37,7 @@ export interface Sprint {
   capacity: number;
   status: 'Planned' | 'In Progress' | 'Completed';
   projectId: string;
+  retrospective_url: string | null;
 }
 
 interface ScrumContextType {
@@ -80,15 +82,20 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   /**
    * Fetch tasks from Supabase on component mount
    */
-  const fetchTasks = async () => {
-    if (!currentProject) return;
-    const { data, error } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('projectId', currentProject.id); // Fetch only current proj task
-    if (error) console.error('Error fetching tasks:', error);
-    else setTasks(data || []);
-  };
+    const fetchTasks = async () => {
+        if (!currentProject) return;
+       
+        const { data, error, count } = await supabase
+            .from('tasks')
+            .select('*', { count: 'exact' })
+            .eq('projectId', currentProject.id)
+            .limit(1000) // Limite máximo de registros
+            .order('createdAt', { ascending: false });
+
+        if (error) console.error('Error fetching tasks:', error);
+        setTasks(data || []);
+        
+    };
   /**
    * Fetch sprints from Supabase
    */
@@ -276,7 +283,17 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const moveTaskStatus = async (taskId: string, newStatus: Task['status']) => {
-    await updateTask({ ...tasks.find(t => t.id === taskId)!, status: newStatus });
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+  
+    // Atualiza o campo completedAt com base no novo status
+    const updatedTask = {
+      ...task,
+      status: newStatus,
+      completedAt: newStatus === 'Done' ? new Date().toISOString() : null, // Define completedAt se a tarefa for marcada como "Done"
+    };
+  
+    await updateTask(updatedTask);
   };
 
   const bulkAssignTasksToSprint = async (taskIds: string[], sprintId: string) => {
