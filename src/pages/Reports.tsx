@@ -21,14 +21,6 @@ const Reports = () => {
     const [selectedSprintFilter, setSelectedSprintFilter] = useState<string>('all');
     const [selectedTeamSprintFilter, setSelectedTeamSprintFilter] = useState<string>('all');
 
-    // Fetch data when project changes
-    useEffect(() => {
-        if (currentProject) {
-            fetchTasks();
-            fetchSprints();
-        }
-    }, [currentProject, fetchTasks, fetchSprints]);
-
     // Set current sprint when sprints change
     useEffect(() => {
         if (sprints.length > 0) {
