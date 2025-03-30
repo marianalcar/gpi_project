@@ -219,9 +219,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const loadRole = async () => {
         try {
-          
-          //console.log("currentProject", currentProject?.id);
-          //console.log('user', user.id); 
           const {data:loadRole, error:  errorRole} = await supabase
           .from('roles')
           .select('role_type')
@@ -231,7 +228,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           if (errorRole) throw errorRole;
           
           setCurrentRole(loadRole.length > 0 ? loadRole[0].role_type : null);
-          console.log(errorRole, "errorRole");
         } catch (err) {
           setError(err instanceof Error ? err.message : 'Failed to load role');
           throw err;
