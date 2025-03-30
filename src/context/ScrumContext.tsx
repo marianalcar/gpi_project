@@ -84,17 +84,12 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
    */
     const fetchTasks = async () => {
         if (!currentProject) return;
-       
-        const { data, error, count } = await supabase
+        const { data, error } = await supabase
             .from('tasks')
-            .select('*', { count: 'exact' })
-            .eq('projectId', currentProject.id)
-            .limit(1000) // Limite máximo de registros
-            .order('createdAt', { ascending: false });
-
-        if (error) throw error;
-        setTasks(data || []);
-        
+            .select('*')
+            .eq('projectId', currentProject.id); // Fetch only current proj task
+        if (error) console.error('Error fetching tasks:', error);
+        else setTasks(data || []);
     };
   /**
    * Fetch sprints from Supabase
