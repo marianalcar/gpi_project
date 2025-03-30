@@ -115,7 +115,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         // Set first project as current if none selected
         //if (data.length > 0 && !currentProject) {
           const savedProject = localStorage.getItem('currentProject');
-          const foundProject = data.find((p) => p.id === projectId ? projectId : null);
+          const foundProject = data.find((p) => p.id === projectId);
           if (projectId && foundProject) {
               setCurrentProject(foundProject);
           } else if (savedProject) {
