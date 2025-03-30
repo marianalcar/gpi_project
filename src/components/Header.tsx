@@ -2,10 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, Bell, Settings, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {useProject} from '../context/ProjectContext';
-import ProjectSelector from './ProjectSelector';
 import { supabase } from '../lib/supabase';
 
 const Header = () => {
+  const { userProjects, invitations, loadUserProjects, setCurrentProject, fetchInvitations } = useProject(); 
   const { user, signOut } = useAuth();
   const {currentRole} = useProject();
 
@@ -14,14 +14,6 @@ const Header = () => {
   const [newDisplayName, setNewDisplayName] = useState('');
   const [isInvitationsOpen, setIsInvitationsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null); // Ref for the dropdown
-  interface Invitation {
-    id: string;
-    project_name: string;
-    created_at: string;
-    role: string;
-  }
-
-  const [invitations, setInvitations] = useState<Invitation[]>([]);
 
   //console.log(currentRole);
   //console.log(user);
@@ -53,43 +45,8 @@ const Header = () => {
     };
   }, []);
 
-  useEffect(() => {
-    fetchInvitations();
-
-    // Optional: Polling mechanism to fetch invitations periodically
-    const interval = setInterval(() => {
-      fetchInvitations();
-    }, 30000); // Fetch every 30 seconds
-
-    return () => clearInterval(interval); // Cleanup interval on unmount
-  }, []);
-
-  const fetchInvitations = async () => {
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from('project_invitations') // Replace with your actual table name
-      .select('*')
-      .eq('invited_user', user.email)
-      .eq('status', 'pending');
-
-    if (error) {
-      console.error('Error fetching invitations:', error);
-    } else {
-      setInvitations(data || []);
-    }
-  };
-
-  // Toggle invitations dropdown
-  const toggleInvitations = async () => {
-    setIsInvitationsOpen(!isInvitationsOpen);
-    if (!isInvitationsOpen) {
-      await fetchInvitations(); // Fetch invitations when opening the dropdown
-    }
-  };
 
   const handleAcceptInvitation = async (invitationId: string) => {
-    const { loadUserProjects } = useProject(); 
     try {
       const { data: invitation, error: fetchError } = await supabase
         .from('project_invitations')
@@ -129,7 +86,7 @@ const Header = () => {
   
       // Optionally, refresh the invitations list
       await fetchInvitations();
-      await loadUserProjects();
+      await loadUserProjects(invitation.project_id); // Load the user's projects again to include the new project
 
       console.log('Invitation accepted and user added to the project.');
     } catch (error) {

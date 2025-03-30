@@ -24,6 +24,13 @@ export interface Project {
   roles?: Role_data[];
 }
 
+export interface Invitation {
+  id: string;
+  project_name: string;
+  created_at: string;
+  role: string;
+}
+
 export enum Role {
   Scrum_master = 'SCRUM_MASTER',
   Developer = 'DEVELOPER',
@@ -39,6 +46,7 @@ interface ProjectContextType {
   userProjects: Project[];
   allProjects: Project[];
   loading: boolean;
+  invitations: Invitation[];
   error: string | null;
   createProject: (name: string, description?: string) => Promise<void>;
   updateProject: (id: string, name: string, description?: string) => Promise<void>;
@@ -46,8 +54,9 @@ interface ProjectContextType {
   setCurrentProject: (project: Project | null) => void;
   currentRole: Role | null;
   setCurrentRole: (role: Role | null) => void;
-  loadUserProjects: () => Promise<void>;
+  loadUserProjects: (projectId?:String) => Promise<void>;
   loadAllProjects: () => Promise<void>;
+  fetchInvitations: () => Promise<void>;
 }
 
 
@@ -62,6 +71,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [error, setError] = useState<string | null>(null);
   const [currentRole, setCurrentRole] = useState<Role | null>(null);
   const [projectUsers, setProjectUsers] = useState<ProjectUser[]>([]);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
 
   const loadAllProjects = async () => {
     try {
@@ -82,7 +92,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   // Load projects and set up real-time subscription
-  const loadUserProjects = async () => {
+  const loadUserProjects = async (projectId?: String) => {
     if (!user) return;
 
     try {
@@ -105,7 +115,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         // Set first project as current if none selected
         //if (data.length > 0 && !currentProject) {
           const savedProject = localStorage.getItem('currentProject');
-          if (savedProject) {
+          const foundProject = data.find((p) => p.id === projectId ? projectId : null);
+          if (projectId && foundProject) {
+              setCurrentProject(foundProject);
+          } else if (savedProject) {
             const parsedProject = JSON.parse(savedProject);
             const foundProject = data.find((p) => p.id === parsedProject.id);
             if (foundProject) {
@@ -149,6 +162,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
             break;
         }
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'project_invitations' }, fetchInvitations)
       .subscribe();
 
     return () => {
@@ -322,6 +336,22 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  const fetchInvitations = async () => {
+      if (!user) return;
+  
+      const { data, error } = await supabase
+        .from('project_invitations') // Replace with your actual table name
+        .select('*')
+        .eq('invited_user', user.email)
+        .eq('status', 'pending');
+  
+      if (error) {
+        console.error('Error fetching invitations:', error);
+      } else {
+        setInvitations(data || []);
+      }
+    };
+
   return (
     <ProjectContext.Provider 
       value={{
@@ -331,6 +361,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         allProjects,
         projectUsers,
         loading,
+        invitations,
         error,
         createProject,
         updateProject,
@@ -341,6 +372,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         updateOwnDisplayName,
         fetchProjectUsers,
         setCurrentRole,
+        fetchInvitations
       }}
     >
       {children}
