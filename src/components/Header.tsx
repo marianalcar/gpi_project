@@ -1,17 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, Bell, Settings, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {useProject} from '../context/ProjectContext';
-import ProjectSelector from './ProjectSelector';
 import { supabase } from '../lib/supabase';
 
 const Header = () => {
+  const { userProjects, invitations, loadUserProjects, setCurrentProject, fetchInvitations } = useProject(); 
   const { user, signOut } = useAuth();
   const {currentRole} = useProject();
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [newDisplayName, setNewDisplayName] = useState('');
+  const [isInvitationsOpen, setIsInvitationsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null); // Ref for the dropdown
 
   //console.log(currentRole);
   //console.log(user);
@@ -29,6 +31,68 @@ const Header = () => {
 
     fetchDisplayName();
   }, [user]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsInvitationsOpen(false); // Close the dropdown
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+
+  const handleAcceptInvitation = async (invitationId: string) => {
+    try {
+      const { data: invitation, error: fetchError } = await supabase
+        .from('project_invitations')
+        .select('project_id, invited_user, role')
+        .eq('id', invitationId)
+        .single();
+  
+      if (fetchError) {
+        console.error('Error fetching invitation:', fetchError);
+        return;
+      }
+  
+      // Update the invitation status to 'accepted'
+      const { error: updateError } = await supabase
+        .from('project_invitations')
+        .update({ status: 'accepted' })
+        .eq('id', invitationId);
+  
+      if (updateError) {
+        console.error('Error updating invitation status:', updateError);
+        return;
+      }
+  
+      const { error: insertError } = await supabase
+      .from('roles') // Replace 'roles' with your actual table name
+      .insert({
+        project_id: invitation.project_id,
+        auth_id: user?.id || '',
+        role_type: invitation.role // Default to 'member' if no role is specified
+      });
+
+    if (insertError) {
+      console.error('Error adding user to roles table:', insertError);
+      return;
+    }
+  
+  
+      // Optionally, refresh the invitations list
+      await fetchInvitations();
+      await loadUserProjects(invitation.project_id); // Load the user's projects again to include the new project
+
+      console.log('Invitation accepted and user added to the project.');
+    } catch (error) {
+      console.error('Error handling invitation acceptance:', error);
+    }
+  };
 
   const handleSignOut = async () => {
     try {
@@ -91,6 +155,27 @@ const Header = () => {
     setIsSettingsOpen(false);
   };
 
+  const handleDeclineInvitation = async (invitationId: string) => {
+    try {
+      const { error } = await supabase
+        .from('project_invitations')
+        .update({ status: 'declined' })
+        .eq('id', invitationId);
+
+      if (error) {
+        console.error('Error declining invitation:', error);
+        return;
+      }
+
+      // Optionally, refresh the invitations list
+      await fetchInvitations();
+
+      console.log('Invitation declined.');
+    } catch (error) {
+      console.error('Error handling invitation decline:', error);
+    }
+  };
+
   return (
     <header className="bg-white border-b border-gray-200 py-4 px-6 flex items-center justify-between relative">
       <div className="flex items-center w-1/3">
@@ -104,10 +189,62 @@ const Header = () => {
         </div>
       </div>
       <div className="flex items-center space-x-4">
-        <ProjectSelector />
-        <button className="p-2 rounded-full hover:bg-gray-100">
-          <Bell size={20} className="text-gray-600" />
-        </button>
+        {/* Bell Button */}
+        <div className="relative">
+          <button
+            className="p-2 rounded-full hover:bg-gray-100 relative"
+            onClick={() => setIsInvitationsOpen(!isInvitationsOpen)}
+          >
+            <Bell size={20} className="text-gray-600" />
+            {invitations.length > 0 && (
+              <span className="absolute top-0 right-0 bg-red-500 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full">
+                {invitations.length}
+              </span>
+            )}
+          </button>
+
+          <div
+            ref={dropdownRef}
+            className={`absolute top-14 right-0 bg-white shadow-lg rounded-lg p-4 border border-gray-200 w-80 z-50 transform transition-transform duration-300 ${
+              isInvitationsOpen ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0 pointer-events-none'
+            }`}
+          >
+            <h3 className="text-sm font-medium text-gray-700 mb-2">Project Invitations</h3>
+            {invitations.length > 0 ? (
+              <ul className="space-y-2">
+                {invitations.map((invitation) => (
+                  <li
+                    key={invitation.id}
+                    className="p-2 border border-gray-200 rounded-md hover:bg-gray-50"
+                  >
+                    <p className="text-sm text-gray-800">
+                      You have been invited to project: {invitation.project_name} as {invitation.role}.
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(invitation.created_at).toLocaleString()}
+                    </p>
+                    <div className="mt-2 flex space-x-2">
+                      <button
+                        className="px-3 py-1 text-sm bg-green-500 text-white rounded-md hover:bg-green-600"
+                        onClick={() => handleAcceptInvitation(invitation.id)}
+                      >
+                        Accept
+                      </button>
+                      <button
+                        className="px-3 py-1 text-sm bg-red-500 text-white rounded-md hover:bg-red-600"
+                        onClick={() => handleDeclineInvitation(invitation.id)}
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-gray-500">No invitations</p>
+            )}
+          </div>
+        </div>
 
         {/* Settings Button */}
         <button className="p-2 rounded-full hover:bg-gray-100 relative" onClick={() => setIsSettingsOpen(!isSettingsOpen)}>

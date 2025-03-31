@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, ListTodo, Calendar, Footprints as Sprint, BarChart3 } from 'lucide-react';
+import ProjectSelector from './ProjectSelector';
 
 const Sidebar = () => {
   const navItems = [
@@ -10,11 +11,12 @@ const Sidebar = () => {
     { path: '/current-sprint', name: 'Current Sprint', icon: <Sprint size={20} /> },
     { path: '/reports', name: 'Reports', icon: <BarChart3 size={20} /> },
   ];
+  
 
   return (
-    <div className="w-64 bg-indigo-800 text-white flex flex-col h-full">
+    <div className="w-60 bg-indigo-800 text-white flex flex-col h-full">
       <div className="p-5 border-b border-indigo-700">
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-5">
           <Sprint size={28} />
           <h1 className="text-xl font-bold">Scrum Planner</h1>
         </div>
@@ -46,6 +48,7 @@ const Sidebar = () => {
             <span className="text-sm font-medium">SP</span>
           </div>
           <div>
+          <ProjectSelector />
             <p className="text-sm font-medium">Scrum Team</p>
             <p className="text-xs text-indigo-300">Agile Project</p>
           </div>
