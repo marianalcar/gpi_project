@@ -165,7 +165,6 @@ const Dashboard = () => {
         <div className="bg-white rounded-xl shadow-sm p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-lg font-semibold text-gray-800">Team Members</h2>
-            <button className="text-indigo-600 text-sm font-medium">View All</button>
           </div>
                 <div className="space-y-4">
                     {tasks
@@ -197,7 +196,6 @@ const Dashboard = () => {
         <div className="bg-white rounded-xl shadow-sm p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-lg font-semibold text-gray-800">Upcoming Tasks</h2>
-            <button className="text-indigo-600 text-sm font-medium">View All</button>
           </div>
           <div className="space-y-3">
             {sprintTasks
@@ -228,7 +226,6 @@ const Dashboard = () => {
         <div className="bg-white rounded-xl shadow-sm p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-lg font-semibold text-gray-800">Recent Activities</h2>
-            <button className="text-indigo-600 text-sm font-medium">View All</button>
           </div>
                 <div className="space-y-4">
                     {tasks
