@@ -104,6 +104,19 @@ const CurrentSprint = () => {
     }));
   };
 
+  const getStatusClass = (status: string) => {
+    switch (status) {
+      case 'In Progress':
+        return 'bg-blue-50 text-blue-500';
+      case 'Review':
+        return 'bg-amber-50 text-amber-500';
+      case 'Done':
+        return 'bg-green-50 text-green-500';
+      default:
+        return 'bg-gray-50 text-gray-500';
+    }
+  };
+
   // Task card component with drag and drop
   const TaskCard = ({ task, index }) => {
     const [{ isDragging }, drag] = useDrag(() => ({
@@ -372,7 +385,7 @@ const CurrentSprint = () => {
                     </span>
 
                     {/* Status */}
-                    <span className="bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded">
+                    <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${getStatusClass(selectedTask.status)}`}>
                       {selectedTask.status}
                     </span>
                   </div>

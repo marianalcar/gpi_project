@@ -209,14 +209,14 @@ const ProductBacklog = () => {
 
 	const getStatusClass = (status: string) => {
 		switch (status) {
-			case 'New':
-				return 'bg-blue-50 text-blue-700';
-			case 'Ready':
-				return 'bg-purple-50 text-purple-700';
-			case 'In Sprint':
-				return 'bg-indigo-50 text-indigo-700';
+			case 'In Progress':
+				return 'bg-blue-50 text-gray-500';
+			case 'Review':
+				return 'bg-amber-50 text-amber-500';
+			case 'Done':
+				return 'bg-green-50 text-green-500';
 			default:
-				return 'bg-gray-50 text-gray-700';
+				return 'bg-gray-50 text-gray-500';
 		}
 	};
 
@@ -266,7 +266,7 @@ const ProductBacklog = () => {
 						<span className="bg-indigo-100 text-indigo-800 text-xs font-medium px-2.5 py-0.5 rounded">
 							{task.storyPoints} points
 						</span>
-						<div className="flex items-center space-x-1">
+						<div className="flex items-center space-x-2">
 							{/* 🔵 Small Edit Button */}
 							{currentRole === Role.Product_owner && (
 								<button 
