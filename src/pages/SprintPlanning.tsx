@@ -19,10 +19,7 @@ import {
 } from 'lucide-react';
 import { useScrumContext, Task, Sprint } from '../context/ScrumContext';
 import {useProject, Role} from '../context/ProjectContext';
-import { SessionManager, useCreateRandomSession, useJoinUrl } from 'react-together';
-import { redirect, useNavigate } from 'react-router-dom';
-import { getCleanUrl, getJoinUrl, getSessionNameFromUrl, getSessionPasswordFromUrl } from 'react-together/dist/utils';
-import {useSetSession} from '@croquet/react';
+import { useCreateRandomSession, useJoinUrl } from 'react-together';
 
 // Item types for drag and drop
 const ItemTypes = {
@@ -93,6 +90,19 @@ const SprintPlanning = () => {
   const joinUrl = useJoinUrl();
 
   const isScrumMasterRole = currentRole === Role.Scrum_master;
+
+  const getStatusClass = (status: string) => {
+		switch (status) {
+			case 'In Progress':
+				return 'bg-blue-50 text-gray-500';
+			case 'Review':
+				return 'bg-amber-50 text-amber-500';
+			case 'Done':
+				return 'bg-green-50 text-green-500';
+			default:
+				return 'bg-gray-50 text-gray-500';
+		}
+	};
 
 
 	// Toggle sort direction
@@ -536,11 +546,13 @@ const SprintPlanning = () => {
                   <div key={task.id} className="flex items-center border border-gray-200 rounded-lg p-3 bg-white">
                     <div className="flex-1">
                       <h3 className="font-medium text-gray-900">{task.title}</h3>
-                      <div className="flex items-center mt-1">
+                      <div className="flex items-center space-x-2">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getPriorityClass(task.priority)}`}>
                           {task.priority}
                         </span>
-                        <span className="ml-2 text-xs text-gray-500">{task.storyPoints} points</span>
+                        <span className="text-xs text-gray-500">{task.storyPoints} points</span>
+                        {/* put the task status and have it have a border rounded with a grey shadow*/}
+                        <span className={`px-2 py-0.5 rounded-full shadow-sm text-xs front-medium ${getStatusClass(task.status)}`}>{task.status}</span>
                       </div>
                     </div>
                     <button 
