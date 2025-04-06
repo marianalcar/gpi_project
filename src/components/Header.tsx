@@ -177,17 +177,7 @@ const Header = () => {
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 py-4 px-6 flex items-center justify-between relative">
-      <div className="flex items-center w-1/3">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
-          <input
-            type="text"
-            placeholder="Search..."
-            className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent w-full"
-          />
-        </div>
-      </div>
+    <header className="bg-white border-b border-gray-200 py-4 px-6 flex items-center justify-end relative">
       <div className="flex items-center space-x-4">
         {/* Bell Button */}
         <div className="relative">

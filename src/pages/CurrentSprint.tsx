@@ -230,9 +230,6 @@ const CurrentSprint = () => {
               {tasks.length}
             </span>
           </div>
-          <button className="text-gray-400 hover:text-gray-600">
-            <Plus size={18} />
-          </button>
         </div>
         <div
           ref={drop}
