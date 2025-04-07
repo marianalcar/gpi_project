@@ -1,9 +1,11 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, ListTodo, Calendar, Footprints as Sprint, BarChart3 } from 'lucide-react';
-import ProjectSelector from './ProjectSelector';
+import { useProject } from '../context/ProjectContext';
 
 const Sidebar = () => {
+  const {currentProject} = useProject()
+  const navigate = useNavigate();
   const navItems = [
     { path: '/', name: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     { path: '/product-backlog', name: 'Product Backlog', icon: <ListTodo size={20} /> },
@@ -42,18 +44,19 @@ const Sidebar = () => {
           ))}
         </ul>
       </nav>
-      <div className="p-4 border-t border-indigo-700">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center">
-            <span className="text-sm font-medium">SP</span>
-          </div>
-          <div>
-          <ProjectSelector />
-            <p className="text-sm font-medium">Scrum Team</p>
-            <p className="text-xs text-indigo-300">Agile Project</p>
+      <button onClick={() => navigate('/project-overview')} className="text-sm text-indigo-100 hover:bg-indigo-700">
+        <div className="p-4 border-t border-indigo-700">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center">
+              <span className="text-sm font-medium">SP</span>
+            </div>
+            <div>
+                <p className="text-sm font-medium">Scrum Team</p>
+                <p className="text-xs text-indigo-300">{currentProject?.name || ""}</p>
+            </div>
           </div>
         </div>
-      </div>
+      </button>
     </div>
   );
 };
