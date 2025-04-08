@@ -45,7 +45,34 @@ const ProductBacklog = () => {
 			task.description.toLowerCase().includes(searchQuery.toLowerCase())
 		);
 
-		// Apply type filter
+		// Apply advanced filters
+		if (filters.assignmentStatus === 'assigned-to-stories') {
+			items = items.filter(task => task.storyId);
+		} else if (filters.assignmentStatus === 'unassigned-to-stories') {
+			items = items.filter(task => !task.storyId);
+		}
+
+		if (filters.sprintStatus === 'in-sprint') {
+			items = items.filter(task => task.sprintId);
+		} else if (filters.sprintStatus === 'not-in-sprint') {
+			items = items.filter(task => !task.sprintId);
+		}
+
+		if (filters.taskStatus !== 'all') {
+			items = items.filter(task => task.status === filters.taskStatus);
+		}
+
+		if (filters.priority !== 'all') {
+			items = items.filter(task => task.priority === filters.priority);
+		}
+		
+		if (filters.storyPoints === 'with') {
+			items = items.filter(task => task.storyPoints > 0);
+		} else if (filters.storyPoints === 'without') {
+			items = items.filter(task => task.storyPoints === 0);
+		}
+
+		// Apply type filter (legacy)
 		if (filterOption === 'stories') items = [];
 		if (filterOption === 'tasks') items = items.filter(task => !task.storyId);
 
@@ -60,12 +87,39 @@ const ProductBacklog = () => {
 	const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
 	const [isStoryModalOpen, setIsStoryModalOpen] = useState(false);
 	const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
+	const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
 	const [sortOption, setSortOption] = useState('none'); 
 	const [editingTask, setEditingTask] = useState<Task | null>(null);
 	const [editingStory, setEditingStory] = useState<Story | null>(null);
 	const [searchQuery, setSearchQuery] = useState('');
 	const [filterOption, setFilterOption] = useState('all');
+	const [showEmptyStories, setShowEmptyStories] = useState(true);
 	
+	// Advanced filter states
+	const [filters, setFilters] = useState({
+		assignmentStatus: 'all', // all, assigned-to-stories, unassigned-to-stories
+		sprintStatus: 'all', // all, in-sprint, not-in-sprint
+		taskStatus: 'all', // all, New, Ready, In Sprint
+		priority: 'all', // all, High, Medium, Low
+		storyPoints: 'all', // all, with, without
+	});
+	
+	// Count active filters
+	const activeFilterCount = Object.entries(filters).filter(([key, value]) => {
+		return value !== 'all';
+	}).length;
+	
+	// Reset all filters
+	const resetFilters = () => {
+		setFilters({
+			assignmentStatus: 'all',
+			sprintStatus: 'all',
+			taskStatus: 'all',
+			priority: 'all',
+			storyPoints: 'all',
+		});
+	};
+
 	// Selected items for deletion
 	const [selectedItems, setSelectedItems] = useState<{tasks: string[], stories: string[]}>({
 		tasks: [],
@@ -78,7 +132,7 @@ const ProductBacklog = () => {
 		description: '',
 		priority: 'Medium',
 		storyPoints: 0,
-		status: 'New'
+		status: 'To Do'
 	});
 
 	const [newStory, setNewStory] = useState<Partial<Story>>({
@@ -99,7 +153,7 @@ const ProductBacklog = () => {
 			description: newTask.description || '',
 			priority: newTask.priority as 'High' | 'Medium' | 'Low',
 			storyPoints: newTask.storyPoints || 0,
-			status: newTask.status as 'New' | 'Ready' | 'In Sprint',
+			status: newTask.status as 'To Do' | 'In Progress' | 'Review' | 'Done',
 			storyId: newTask.storyId,
 			projectId: currentProject.id 
 		});
@@ -109,7 +163,7 @@ const ProductBacklog = () => {
 			description: '',
 			priority: 'Medium',
 			storyPoints: 0,
-			status: 'New'
+			status: 'To Do'
 		});
 		setIsTaskModalOpen(false);
 	};
@@ -273,7 +327,7 @@ const ProductBacklog = () => {
 									onClick={() => setEditingTask(task)} 
 									className="text-blue-600 hover:text-blue-800 text-xs font-medium"
 								>
-									✎ Edit
+									 Edit
 								</button>
 							)}
 
@@ -350,7 +404,7 @@ const ProductBacklog = () => {
 											onClick={() => setEditingStory(story)} 
 											className="text-blue-600 hover:text-blue-800 text-xs font-medium"
 										>
-											✎ Edit
+											 Edit
 										</button>
 									)}
 
@@ -407,9 +461,9 @@ const ProductBacklog = () => {
 		return (
 			<div 
 				ref={currentRole === Role.Product_owner ? drop : null} 
-				className={`mt-6 p-4 border border-gray-200 rounded-lg ${isOver && currentRole === Role.Product_owner ? 'bg-gray-50' : 'bg-white'}`}
+				className={`m-6 p-4 border border-gray-200 rounded-lg ${isOver && currentRole === Role.Product_owner ? 'bg-gray-50' : 'bg-white'}`}
 			>
-				<h2 className="text-lg font-semibold text-gray-800 mb-4">Unassigned Tasks</h2>
+				<h2 className="text-lg font-semibold text-gray-800 mb-4">Unassigned Tasks to Stories</h2>
 				{unassignedTasks.length === 0 ? (
 					<div className="text-center py-8 text-gray-500 border border-dashed border-gray-300 rounded-lg">
 						All tasks are assigned to stories
@@ -464,6 +518,30 @@ const ProductBacklog = () => {
 							/>
 						</div>
 						<div className="flex items-center space-x-3">
+							<div className="flex items-center space-x-2 mr-1">
+								<label className="text-sm font-medium text-gray-600 whitespace-nowrap">Show empty stories</label>
+								<label className="relative inline-flex items-center cursor-pointer">
+									<input
+										type="checkbox"
+										checked={showEmptyStories}
+										onChange={() => setShowEmptyStories(!showEmptyStories)}
+										className="sr-only peer"
+									/>
+									<div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+								</label>
+							</div>
+							<button
+								onClick={() => setIsFilterModalOpen(true)}
+								className={`px-3 py-2 border ${activeFilterCount > 0 ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-gray-300 text-gray-700'} rounded-lg flex items-center hover:bg-gray-50`}
+							>
+								<Filter size={18} className="mr-1.5" />
+								Filters
+								{activeFilterCount > 0 && (
+									<span className="ml-1.5 bg-indigo-100 text-indigo-800 text-xs font-medium px-2 py-0.5 rounded-full">
+										{activeFilterCount}
+									</span>
+								)}
+							</button>
 							<select
 								value={sortOption}
 								onChange={(e) => setSortOption(e.target.value)}
@@ -485,14 +563,27 @@ const ProductBacklog = () => {
 						</div>
 					) : (
 						<div className="space-y-4">
-							{stories.map(story => (
-								<DroppableStory key={story.id} story={story} />
-							))}
+							{stories
+								.filter(story => {
+									// Filter logic for empty stories
+									if (!showEmptyStories) {
+										// Get tasks that belong to this story
+										const tasksCount = getSortedBacklogItems().filter(task => task.storyId === story.id).length;
+										// Only include stories with at least one task
+										console.log("Taskcount ", tasksCount);
+										return tasksCount > 0;
+									}
+									return true; // Include all stories if showEmptyStories is true
+								})
+								.map(story => (
+									<DroppableStory key={story.id} story={story} />
+								))
+							}
 						</div>
 					)}
 					
-					<BacklogDropArea />
 				</div>
+				<BacklogDropArea />
 			</div>
 
 			{/* Choose Item Type Modal */}
@@ -602,13 +693,13 @@ const ProductBacklog = () => {
 									<div>
 										<label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
 										<select
-											value={newTask.status || 'New'}
-											onChange={(e) => setNewTask({ ...newTask, status: e.target.value as 'New' | 'Ready' | 'In Sprint' })}
+											value={newTask.status || 'To Do'}
+											onChange={(e) => setNewTask({ ...newTask, status: e.target.value as 'To Do' | 'In Progress' | 'Review' | 'Done' })}
 											className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
 										>
-											<option value="New">New</option>
-											<option value="Ready">Ready</option>
-											<option value="In Sprint">In Sprint</option>
+											<option value="In Progress">In Progress</option>
+											<option value="Review">Review</option>
+											<option value="Done">Done</option>
 										</select>
 									</div>
 									{/*
@@ -846,6 +937,113 @@ const ProductBacklog = () => {
 		</div>
 	</div>
 )}
+			{/* Add here the Filter Modal */}
+			{isFilterModalOpen && (
+				<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+					<div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+						<div className="p-6">
+							<div className="flex items-center justify-between mb-4">
+								<h2 className="text-xl font-semibold text-gray-800">Filter Backlog Items</h2>
+								{activeFilterCount > 0 && (
+									<button
+										onClick={resetFilters}
+										className="text-sm text-indigo-600 hover:text-indigo-800"
+									>
+										Reset filters
+									</button>
+								)}
+							</div>
+							
+							<div className="space-y-4">
+								<div>
+									<label className="block text-sm font-medium text-gray-700 mb-1">Story Assignment</label>
+									<select
+										value={filters.assignmentStatus}
+										onChange={(e) => setFilters({...filters, assignmentStatus: e.target.value})}
+										className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+									>
+										<option value="all">All tasks</option>
+										<option value="assigned-to-stories">Assigned to stories</option>
+										<option value="unassigned-to-stories">Not assigned to any story</option>
+									</select>
+								</div>
+								
+								<div>
+									<label className="block text-sm font-medium text-gray-700 mb-1">Sprint Status</label>
+									<select
+										value={filters.sprintStatus}
+										onChange={(e) => setFilters({...filters, sprintStatus: e.target.value})}
+										className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+									>
+										<option value="all">All sprint statuses</option>
+										<option value="in-sprint">In sprint</option>
+										<option value="not-in-sprint">Not in any sprint</option>
+									</select>
+								</div>
+								
+								<div>
+									<label className="block text-sm font-medium text-gray-700 mb-1">Task Status</label>
+									<select
+										value={filters.taskStatus}
+										onChange={(e) => setFilters({...filters, taskStatus: e.target.value})}
+										className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+									>
+										<option value="all">All statuses</option>
+										<option value="To Do">To Do</option>
+										<option value="In Progress">In Progress</option>
+										<option value="Review">Review</option>
+										<option value="Done">Done</option>
+									</select>
+								</div>
+								
+								<div>
+									<label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+									<select
+										value={filters.priority}
+										onChange={(e) => setFilters({...filters, priority: e.target.value})}
+										className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+									>
+										<option value="all">All priorities</option>
+										<option value="High">High priority</option>
+										<option value="Medium">Medium priority</option>
+										<option value="Low">Low priority</option>
+									</select>
+								</div>
+								
+								<div>
+									<label className="block text-sm font-medium text-gray-700 mb-1">Story Points</label>
+									<select
+										value={filters.storyPoints}
+										onChange={(e) => setFilters({...filters, storyPoints: e.target.value})}
+										className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+									>
+										<option value="all">All tasks</option>
+										<option value="with">With story points</option>
+										<option value="without">Without story points</option>
+									</select>
+								</div>
+								
+								{/* Removed the Show empty stories toggle from here */}
+							</div>
+							
+							<div className="mt-6 flex justify-end space-x-3">
+								<button
+									onClick={() => setIsFilterModalOpen(false)}
+									className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+								>
+									Cancel
+								</button>
+								<button
+									onClick={() => setIsFilterModalOpen(false)}
+									className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+								>
+									Apply Filters
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 };
