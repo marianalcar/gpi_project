@@ -9,7 +9,7 @@ export interface Task {
   description: string;
   priority: 'High' | 'Medium' | 'Low';
   storyPoints: number;
-  status: 'New' | 'Ready' | 'In Sprint' | 'To Do' | 'In Progress' | 'Review' | 'Done';
+  status: 'To Do' | 'In Progress' | 'Review' | 'Done';
   createdAt: string;
   assignees?: string[];
   storyId?: string;
