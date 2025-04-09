@@ -19,6 +19,7 @@ import Reports from './pages/Reports';
 import PrivateRoute from './components/PrivateRoute';
 import ProjectSearch from './pages/ProjectSearch';
 import Retrospective from './pages/Retrospective';
+import ProjectOverview from './pages/ProjectOverview';
 
 function App() {
   return (
@@ -39,6 +40,7 @@ function App() {
                 </Route>
                 <Route path="/project-search" element={<ProjectSearch />} />
                 <Route path="/retrospective" element={<Retrospective />} />
+                <Route path="/project-overview" element={<ProjectOverview />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </DndProvider>
